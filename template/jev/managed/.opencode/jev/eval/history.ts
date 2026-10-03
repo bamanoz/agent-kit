@@ -44,16 +44,19 @@ export type HistoryQuery = {
   readonly dbPath: string
   readonly directory: string
   readonly sinceDays: number
+  // Исключить последние N дней: для проверки порогов на данных, не использованных при подборе.
+  readonly skipDays: number
   readonly maxSessions: number
 }
 
 export function openHistory(query: HistoryQuery): { readonly sessions: () => Iterable<Session>; readonly close: () => void } {
   const db = new DatabaseSync(query.dbPath, { readOnly: true })
   const since = Date.now() - query.sinceDays * 86_400_000
+  const until = Date.now() - query.skipDays * 86_400_000
   // Сессии проекта, включая его worktree и дочерние сессии субагентов.
   const ids = db
-    .prepare("select id, title from session where (directory = ? or directory like ?) and time_created >= ? order by time_created desc limit ?")
-    .all(query.directory, `${query.directory}/%`, since, query.maxSessions)
+    .prepare("select id, title from session where (directory = ? or directory like ?) and time_created >= ? and time_created < ? order by time_created desc limit ?")
+    .all(query.directory, `${query.directory}/%`, since, until, query.maxSessions)
   const messages = db.prepare("select id, data from message where session_id = ? order by time_created, id")
   const parts = db.prepare("select message_id, data from part where session_id = ? order by message_id, id")
 

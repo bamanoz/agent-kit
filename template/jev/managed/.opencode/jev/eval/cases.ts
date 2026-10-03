@@ -95,15 +95,16 @@ export type SubagentCase = {
 }
 
 const HARD_FAIL = /Session error|Bad request from AI provider|internal error|\bTask (failed|error)\b|<task_error>/i
+// Явный отказ оркестратора от результата; «сделаю сам» без признака сбоя не считается отказом.
 const REJECTED =
-  /(завершил[аси]{0,2}\s+(с\s+)?ошибк|без результат|пуст(ой|ым|ого)\s+(ответ|результат|отчет|отчёт)|оборва|не вернул|не дал результат|результат(а)?\s+нет|перезапущ|перезапуск(аю|у)\s+(задач|делегац|субагент)|повтор(ю|яю)\s+(задач|делегац)|сделаю сам|выполню сам|соберу (нужное )?сам)/i
+  /(завершил[аси]{0,2}\s+(с\s+)?ошибк|без результат|пуст(ой|ым|ого)\s+(ответ|результат|отчет|отчёт)|оборва(лся|н)|не вернул[аи]?\s+(результат|итог|вывод)|не дал[аи]?\s+результат|результат(а)?\s+нет|перезапуска(ю|ем)\s+(задач|делегац|субагент)|повтор(ю|яю)\s+(задач|делегац)|(ошибк|сбо)[а-я]*[^.]{0,60}(сделаю|выполню|соберу)( нужное)? сам)/i
 
 export function labelReport(report: string, nextTexts: readonly string[], relaunched: boolean): { readonly bad: boolean; readonly reason: string } {
   const body = report.replace(/^[\s\S]*?\n---\n/, "").trim()
   if (HARD_FAIL.test(report)) return { bad: true, reason: "hard_fail" }
   if (body.length < 80) return { bad: true, reason: "empty" }
   if (relaunched) return { bad: true, reason: "relaunched" }
-  if (REJECTED.test(nextTexts.join("\n").slice(0, 1500))) return { bad: true, reason: "rejected_by_orchestrator" }
+  if (REJECTED.test((nextTexts[0] ?? "").slice(0, 1500))) return { bad: true, reason: "rejected_by_orchestrator" }
   return { bad: false, reason: "accepted" }
 }
 

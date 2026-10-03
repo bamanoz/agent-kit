@@ -41,6 +41,7 @@ test("метка отчета: ошибка провайдера, пустой �
   assert.equal(labelReport(`${head}ок`, [], false).reason, "empty")
   assert.equal(labelReport(`${head}${"Результат анализа. ".repeat(10)}`, ["Задача завершилась ошибкой без результата; соберу нужное сам."], false).reason, "rejected_by_orchestrator")
   assert.equal(labelReport(`${head}${"Результат анализа. ".repeat(10)}`, ["Проверю коммит субагента."], false).bad, false)
+  assert.equal(labelReport(`${head}${"Результат анализа. ".repeat(10)}`, ["Все готовы, коммичу.", "Субагент правил общие файлы; общие правки я сделаю сам."], false).bad, false)
 })
 
 test("сводка: ложное скрытие считается по нужным строкам в скрытых фрагментах", () => {

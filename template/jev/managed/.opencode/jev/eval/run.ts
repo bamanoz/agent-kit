@@ -8,7 +8,7 @@ import { createDecide } from "../client.ts"
 import { planFilter, worthAsking } from "../filters.ts"
 import { readSkipReason } from "../rules.ts"
 import { loadSettings } from "../settings.ts"
-import { evaluateFilter, evaluateSubagent, type FilterCase, type SubagentCase } from "./cases.ts"
+import { evaluateFilter, evaluateSubagent, labelReport, type FilterCase, type SubagentCase } from "./cases.ts"
 import { defaultDbPath, openHistory, taskAt, textsAfter, toolsAfter, type Session, type ToolEvent } from "./history.ts"
 import { summarize } from "./summary.ts"
 
@@ -24,11 +24,13 @@ const { values } = parseArgs({
     root: { type: "string", default: process.cwd() },
     db: { type: "string", default: defaultDbPath() },
     days: { type: "string", default: "45" },
+    "skip-days": { type: "string", default: "0" },
     sessions: { type: "string", default: "400" },
     limit: { type: "string", default: "300" },
     out: { type: "string" },
     resume: { type: "boolean", default: false },
     "summary-only": { type: "boolean", default: false },
+    relabel: { type: "boolean", default: false },
   },
 })
 
@@ -61,7 +63,7 @@ function collect(): readonly Queued[] {
   const perSession = { read: Math.max(2, Math.ceil(quota.read / 10)), output: Math.max(2, Math.ceil(quota.output / 10)), subagent: Math.max(2, Math.ceil(quota.subagent / 10)) }
   const picked: Queued[] = []
   const taken = { read: 0, output: 0, subagent: 0 }
-  const history = openHistory({ dbPath: values.db, directory: root.replace(/\/\.worktrees\/[^/]+$/, ""), sinceDays: Number(values.days), maxSessions: Number(values.sessions) })
+  const history = openHistory({ dbPath: values.db, directory: root.replace(/\/\.worktrees\/[^/]+$/, ""), sinceDays: Number(values.days), skipDays: Number(values["skip-days"]), maxSessions: Number(values.sessions) })
   for (const session of history.sessions()) {
     const local = { read: 0, output: 0, subagent: 0 }
     const seen = new Set<string>()
@@ -109,8 +111,23 @@ function collect(): readonly Queued[] {
   return picked
 }
 
+// Пересчет меток «отчет непригоден» по истории без повторных вызовов Jev (после правки правил разметки).
+function relabel(cases: readonly (FilterCase | SubagentCase)[]): readonly (FilterCase | SubagentCase)[] {
+  const labels = new Map<string, ReturnType<typeof labelReport>>()
+  const history = openHistory({ dbPath: values.db, directory: root.replace(/\/\.worktrees\/[^/]+$/, ""), sinceDays: Number(values.days), skipDays: Number(values["skip-days"]), maxSessions: Number(values.sessions) })
+  for (const session of history.sessions())
+    for (const item of session.timeline)
+      if (item.kind === "tool" && settings.subagent.tools.includes(item.event.tool))
+        labels.set(caseId(session.id, item.event.order), labelReport(item.event.output, textsAfter(session, item.event.order, 2), relaunched(session, item.event)))
+  history.close()
+  return cases.map((item) => {
+    const label = item.kind === "subagent" ? labels.get(String((item as SubagentCase & { readonly id?: string }).id)) : undefined
+    return label === undefined ? item : { ...item, actualBad: label.bad, actualReason: label.reason }
+  })
+}
+
 async function main(): Promise<void> {
-  if (!values["summary-only"]) {
+  if (!values["summary-only"] && !values.relabel) {
     const done = new Set<string>()
     if (values.resume && existsSync(casesFile)) {
       for (const line of readFileSync(casesFile, "utf8").split("\n").filter(Boolean)) done.add(String(JSON.parse(line).id))
@@ -134,7 +151,9 @@ async function main(): Promise<void> {
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, worker))
   }
-  const cases = readFileSync(casesFile, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as FilterCase | SubagentCase)
+  const loaded = readFileSync(casesFile, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as FilterCase | SubagentCase)
+  const cases = values.relabel ? relabel(loaded) : loaded
+  if (values.relabel) writeFileSync(casesFile, cases.map((item) => JSON.stringify(item)).join("\n") + "\n")
   const report = summarize(cases, settings)
   writeFileSync(join(outDir, "report.md"), report)
   console.log(report)
