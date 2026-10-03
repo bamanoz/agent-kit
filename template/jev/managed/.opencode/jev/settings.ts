@@ -74,7 +74,7 @@ export const DEFAULTS: Settings = {
     ],
     pinPatterns: ["(?:CHG|ADR|OQ|ARCH)-\\d{3,4}"],
   },
-  subagent: { tools: ["task", "background_output"], flagThreshold: 0.6 },
+  subagent: { tools: ["task", "background_output"], flagThreshold: 0.9 },
 }
 
 type Json = Readonly<Record<string, unknown>>

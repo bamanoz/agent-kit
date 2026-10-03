@@ -25,6 +25,9 @@ const QUESTIONS = {
 
 type Flag = keyof typeof QUESTIONS
 const FLAGS = Object.keys(QUESTIONS) as readonly Flag[]
+// Пометку ставит только incomplete: по оценке на истории unverified и stub дают в основном ложные
+// срабатывания (отчеты о review и read-only задачах). Они остаются в журнале для анализа.
+export const FLAGGING: readonly Flag[] = ["incomplete"]
 
 const NOTES: Readonly<Record<Flag, string>> = {
   incomplete: "результат пустой, оборван, с ошибкой или без запрошенных выводов",
@@ -65,7 +68,7 @@ export async function checkSubagent(input: SubagentInput): Promise<SubagentResul
     if (probability === undefined) return { kind: "error", reason: "missing_answer" }
     scores[flag] = Math.round(probability * 100) / 100
   }
-  const raised = FLAGS.filter((flag) => scores[flag] >= input.flagThreshold)
+  const raised = FLAGGING.filter((flag) => scores[flag] >= input.flagThreshold)
   const note =
     raised.length === 0
       ? undefined

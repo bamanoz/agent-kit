@@ -21,6 +21,6 @@
   },
   "subagent": {
     "tools": ["task", "background_output"],
-    "flagThreshold": 0.6
+    "flagThreshold": 0.9
   }
 }

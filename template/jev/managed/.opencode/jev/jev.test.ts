@@ -73,7 +73,7 @@ test("если экономия мала, фильтр ничего не мен�
 })
 
 test("проверка субагента пропускает сообщения о запуске фоновой задачи", async () => {
-  const result = await checkSubagent({ assignment: "x", report: "Background task launched.\nTask ID: bg_1", decide: failingDecide, flagThreshold: 0.6 })
+  const result = await checkSubagent({ assignment: "x", report: "Background task launched.\nTask ID: bg_1", decide: failingDecide, flagThreshold: 0.9 })
   assert.equal(result.kind, "skip")
 })
 
@@ -85,7 +85,7 @@ test("проверка субагента добавляет пометку пр
     ms: 3,
     cached: false,
   })
-  const result = await checkSubagent({ assignment: "Найди обработчик", report: "Ошибка: модель не ответила", decide, flagThreshold: 0.6 })
+  const result = await checkSubagent({ assignment: "Найди обработчик", report: "Ошибка: модель не ответила", decide, flagThreshold: 0.9 })
   assert.equal(result.kind, "checked")
   if (result.kind === "checked") assert.match(result.note ?? "", /Subagent Reliability/)
 })

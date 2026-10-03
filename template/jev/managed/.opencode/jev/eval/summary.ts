@@ -1,5 +1,6 @@
 // Сводка оценки: ложные скрытия, экономия по порогам, точность проверки субагентов, вердикт.
 import type { Settings } from "../settings.ts"
+import { FLAGGING } from "../subagent.ts"
 import type { FilterCase, SubagentCase } from "./cases.ts"
 
 // Критерии включения режима on (обсуждены с пользователем).
@@ -105,7 +106,8 @@ function filterSection(name: string, all: readonly FilterCase[], settings: Setti
 function subagentSection(all: readonly SubagentCase[], settings: Settings): string[] {
   const scored = all.filter((item) => item.status === "scored" && item.scores !== undefined)
   const threshold = settings.subagent.flagThreshold
-  const flagged = (item: SubagentCase): boolean => Object.values(item.scores ?? {}).some((p) => p >= threshold)
+  const flaggedAt = (item: SubagentCase, at: number): boolean => FLAGGING.some((flag) => (item.scores?.[flag] ?? 0) >= at)
+  const flagged = (item: SubagentCase): boolean => flaggedAt(item, threshold)
   const tp = scored.filter((item) => flagged(item) && item.actualBad).length
   const fp = scored.filter((item) => flagged(item) && !item.actualBad).length
   const fn = scored.filter((item) => !flagged(item) && item.actualBad).length
@@ -123,6 +125,16 @@ function subagentSection(all: readonly SubagentCase[], settings: Settings): stri
     "",
     `При пороге ${threshold}: пометок ${tp + fp}, верных ${tp}, ложных ${fp}, пропущено непригодных ${fn}.`,
     `Точность ${pct(precision)} (норма ≥ ${pct(CRITERIA.subagentPrecisionMin)}), полнота ${pct(recall)}, ложные пометки на нормальных отчетах ${pct(falseFlag)} (норма ≤ ${pct(CRITERIA.subagentFalseFlagMax)}).`,
+    "",
+    "",
+    "| порог | пометок | верных | точность | полнота | ложные на нормальных |",
+    "|---|---|---|---|---|---|",
+    ...[0.5, 0.7, 0.8, 0.85, 0.9, 0.95].map((at) => {
+      const marks = scored.filter((item) => flaggedAt(item, at))
+      const right = marks.filter((item) => item.actualBad).length
+      const bad = scored.length - good
+      return `| ${at}${at === threshold ? " ←" : ""} | ${marks.length} | ${right} | ${pct(marks.length === 0 ? 0 : right / marks.length)} | ${pct(bad === 0 ? 0 : right / bad)} | ${pct(good === 0 ? 0 : (marks.length - right) / good)} |`
+    }),
     "",
     `**Вердикт: ${pass ? "можно включать on" : "оставить shadow/off"}.**`,
     "",
