@@ -11,7 +11,11 @@
   ADR-0001, CHG-0001 и шаблонами `ARCH`/`ADR`/`CHG`/`OQ`;
 - **правила агентов**: управляемый блок `AGENTS.md` (память, согласованность,
   надежность и изоляция субагентов), `scripts/agent-worktree`, команды
-  OpenCode `/memory-checkpoint` и `/memory-change`.
+  OpenCode `/memory-checkpoint` и `/memory-change`;
+- **слой решений Jev** (необязательный компонент `jev`): плагин OpenCode,
+  который через модель решений Jev скрывает нерелевантные задаче фрагменты
+  больших выводов `read`/`bash` и помечает подозрительные отчеты субагентов.
+  По умолчанию выключен; переключатель `scripts/jev on|shadow|off`.
 
 Доменные части digital-rouble (KB, ТП, стенды, C#-правила, скиллы) в комплект
 не входят.
@@ -62,20 +66,26 @@ Mempalace (`.venv-mempalace`) и палата платформенно-зави�
 Linux, macOS, WSL:
 
 ```bash
-tar xzf agent-kit-1.1.0.tar.gz
-agent-kit-1.1.0/install.sh ~/work/new-project
-agent-kit-1.1.0/install.sh ~/work/new-project --dry-run   # только показать
+tar xzf agent-kit-1.2.0.tar.gz
+agent-kit-1.2.0/install.sh ~/work/new-project
+agent-kit-1.2.0/install.sh ~/work/new-project --dry-run   # только показать
 ```
 
-Windows (cmd или PowerShell), архив `agent-kit-1.1.0.zip`:
+Windows (cmd или PowerShell), архив `agent-kit-1.2.0.zip`:
 
 ```bat
-agent-kit-1.1.0\install.cmd C:\work\new-project
+agent-kit-1.2.0\install.cmd C:\work\new-project
 ```
 
 Параметры: `--name`, `--wing`, `--omo <spec|none>`, `--venv shared|local`,
 `--venv-dir`, `--python`, `--wheelhouse <каталог>`, `--no-mempalace`,
-`--skip-probe`, `--dry-run`. Справка: `install.sh --help` / `install.cmd --help`.
+`--no-jev`, `--only <base,jev>`, `--skip-probe`, `--dry-run`.
+
+Только слой Jev — для проекта, где обвязка уже есть или не нужна:
+
+```bash
+agent-kit-1.2.0/install.sh ~/work/project --only jev
+``` Справка: `install.sh --help` / `install.cmd --help`.
 
 ## Что происходит при установке
 
@@ -87,7 +97,9 @@ agent-kit-1.1.0\install.cmd C:\work\new-project
 | `opencode.json` | Добавляются отсутствующие `mcp.mempalace` и плагин OMO; ручные настройки не меняются, запуск из версии 1.0.0 переводится на `scripts/mempalace-mcp` |
 | `.venv-mempalace` | Ссылка на общее окружение (Linux: `~/.local/share/agent-kit/venvs/mempalace-3.9.0`, Windows: `%LOCALAPPDATA%\agent-kit\venvs\mempalace-3.9.0`; в Windows при отсутствии прав на symlink создается junction) или локальное окружение при `--venv local` |
 | `.mempalace/palace`, `mempalace.yaml` | Создаются при первой установке; в палату пишется первая запись в комнату `implementation-overview`. Глобальный `~/.mempalace/known_entities.json` не изменяется |
-| `.agent-kit.json` | Имя проекта, крыло и версии; повторная установка берет крыло отсюда |
+| `.opencode/plugins/jev.ts`, `.opencode/jev/*.ts`, `scripts/jev*` | Компонент `jev`: управляются комплектом |
+| `.opencode/jev.json` | Компонент `jev`: настройки проекта, создаются один раз |
+| `.agent-kit.json` | Имя проекта, крыло, версии и установленные компоненты; повторная установка берет крыло отсюда |
 
 После установки скрипт запускает MCP-сервер так же, как OpenCode, и
 проверяет `tools/list`, запись и поиск в крыле проекта.
@@ -105,10 +117,10 @@ Mempalace и кэш модели эмбеддингов.
 ./build.sh --with-wheels windows   # или linux; Python 3.12, x64
 ```
 
-Архив `agent-kit-1.1.0-offline-<платформа>-py312` содержит каталог `wheels/`:
+Архив `agent-kit-1.2.0-offline-<платформа>-py312` содержит каталог `wheels/`:
 
 ```bat
-agent-kit-1.1.0\install.cmd C:\work\project --wheelhouse agent-kit-1.1.0\wheels --python "C:\Program Files\Python312\python.exe"
+agent-kit-1.2.0\install.cmd C:\work\project --wheelhouse agent-kit-1.2.0\wheels --python "C:\Program Files\Python312\python.exe"
 ```
 
 Модель `onnx-community/embeddinggemma-300m-ONNX` скачивается в кэш Hugging
@@ -120,3 +132,66 @@ Face при первом обращении; для машины без сети
 Запустите установщик новой версии для того же каталога. Проектные файлы и
 палата сохраняются, управляемые блоки и скрипты обновляются с резервными
 копиями `*.bak-<время>` (исключены из Git).
+
+## Слой решений Jev
+
+Jev — модель решений TypeSafe AI: не пишет текст, а отвечает на типизированные
+вопросы о переданном состоянии вероятностями. Комплект использует ее через
+API ApiClo (`https://apiclo.com/v1/decisions`, модель `jev-latest`).
+
+| Функция | Что делает в режиме `on` |
+| --- | --- |
+| Фильтр `read` | Файл больше 12 000 символов делится на фрагменты; фрагменты, которые Jev счел ненужными для задачи, заменяются пометкой с диапазоном строк и подсказкой `read offset/limit` |
+| Фильтр вывода `bash` | То же для вывода больше 16 000 символов; первый и последний фрагменты и строки с ошибками, предупреждениями и итогами не скрываются |
+| Проверка субагента | К отчету `task`/`background_output` дописывается пометка, если он похож на пустой, оборванный, неподтвержденный или с заглушками |
+
+Фильтр не трогает: чтение с `offset`/`limit`, повторное чтение того же файла,
+файлы, имя которых есть в задаче, инструкции (`AGENTS.md`, `SKILL.md`,
+`opencode.json`, `.opencode/`, планы OMO) и фрагменты с идентификаторами из
+задачи. Если скрытие экономит меньше 30% вывода, вывод не меняется.
+
+### Режимы
+
+```bash
+scripts/jev status    # режим, источник, наличие ключа
+scripts/jev shadow    # решения только журналируются, агент работает как без Jev
+scripts/jev on        # решения применяются
+scripts/jev off       # плагин ничего не делает (по умолчанию)
+```
+
+Режим хранится в `.opencode/jev.mode` (не версионируется) и читается перед
+каждым вызовом тула: перезапуск OpenCode не нужен. Для одного запуска:
+`JEV_MODE=off opencode run ...`. Любой сбой Jev (нет ключа, таймаут 8 с,
+ошибка API) оставляет вывод тула без изменений; после трех сбоев подряд
+плагин две минуты не обращается к Jev.
+
+### Ключ
+
+Переменная `APICLO_API_KEY` или учетная запись `apiclo` в OpenCode
+(`opencode auth login`). Провайдер, модель и имена задаются в
+`.opencode/jev.json` (`provider`).
+
+### Сравнение режимов
+
+Журнал решений пишется в `.opencode/jev-log/*.jsonl`.
+
+```bash
+scripts/jev report --days 7            # сводка: применено, тень, пропуски, ошибки, экономия
+scripts/jev compare <ses_A> <ses_B>    # две сессии OpenCode вместе с субагентами
+```
+
+Порядок A/B-проверки: одна и та же задача в двух сессиях —
+`JEV_MODE=off opencode run "<задача>"` и `JEV_MODE=on opencode run "<задача>"`,
+затем `scripts/jev compare` по идентификаторам из `opencode session list`.
+
+### Настройка проекта
+
+`.opencode/jev.json` создается один раз и принадлежит проекту. Списки
+`neverFilter` (регулярные выражения путей) и `pinPatterns` (идентификаторы,
+фрагменты с которыми не скрываются) дополняют значения комплекта; функции
+отключаются в `features`. Неверное поле игнорируется.
+
+### Разработка комплекта
+
+`dev/check.sh` — проверка типов TypeScript (strict) и тесты плагина без сети
+(Node 22.18+, зависимости в `dev/node_modules`, в архив не входят).

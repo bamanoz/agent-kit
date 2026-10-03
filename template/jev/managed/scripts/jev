@@ -1,0 +1,10 @@
+#!/bin/sh
+# Переключатель слоя решений Jev и отчеты (Linux, macOS, WSL).
+# Логика в jev_cli.py; парный файл для Windows — jev.cmd.
+#   scripts/jev on|shadow|off|status|report|compare ...   справка: --help
+DIR=$(cd "$(dirname "$0")" && pwd)
+for py in python3 python; do
+  command -v "$py" >/dev/null 2>&1 && exec "$py" "$DIR/jev_cli.py" "$@"
+done
+echo "ошибка: не найден python3" >&2
+exit 1

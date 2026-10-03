@@ -1,0 +1,26 @@
+{
+  "provider": {
+    "endpoint": "https://apiclo.com/v1/decisions",
+    "model": "jev-latest",
+    "apiKeyEnv": "APICLO_API_KEY",
+    "opencodeAuth": "apiclo",
+    "timeoutMs": 8000
+  },
+  "features": {
+    "readFilter": true,
+    "outputFilter": true,
+    "subagentCheck": true
+  },
+  "filter": {
+    "keepThreshold": 0.15,
+    "readMinChars": 12000,
+    "outputMinChars": 16000,
+    "outputTools": ["bash"],
+    "neverFilter": [],
+    "pinPatterns": []
+  },
+  "subagent": {
+    "tools": ["task", "background_output"],
+    "flagThreshold": 0.6
+  }
+}
