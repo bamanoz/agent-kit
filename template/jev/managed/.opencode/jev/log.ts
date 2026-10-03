@@ -18,6 +18,7 @@ export type LogEntry = {
   readonly afterChars?: number
   readonly chunks?: number
   readonly hidden?: number
+  readonly hiddenRanges?: readonly (readonly [number, number])[]
   readonly scores?: Readonly<Record<string, number>>
   readonly jevMs?: number
   readonly jevInputTokens?: number

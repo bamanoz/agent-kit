@@ -52,8 +52,10 @@ export type SubagentResult =
 
 export async function checkSubagent(input: SubagentInput): Promise<SubagentResult> {
   if (NOT_A_REPORT.test(input.report)) return { kind: "skip", reason: "not_a_report" }
+  // У background_output задания в аргументах нет: берем описание из заголовка результата.
+  const assignment = input.assignment || (/^Description: (.+)$/m.exec(input.report)?.[1] ?? "")
   const outcome = await input.decide({
-    state: { assignment: input.assignment.slice(0, 4000), report: input.report.slice(-REPORT_CHARS) },
+    state: { assignment: assignment.slice(0, 4000), report: input.report.slice(-REPORT_CHARS) },
     questions: QUESTIONS,
   })
   if (!outcome.ok) return { kind: "error", reason: outcome.reason }

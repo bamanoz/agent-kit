@@ -9,6 +9,11 @@
   report [--days N]       сводка журнала решений (по умолчанию за 7 дней)
   compare <ses_A> <ses_B> сравнить две сессии OpenCode с субагентами: токены, стоимость,
                           вызовы и объем вывода тулов, решения Jev
+  eval [параметры]        оценка Jev по истории сессий проекта: ложные скрытия, экономия по
+                          порогам, точность проверки субагентов, вердикт по каждой функции.
+                          Модели агентов не вызываются, платный только Jev (~$0,001 за случай).
+                          --limit N (300), --days N (45), --resume, --summary-only;
+                          результат в .opencode/jev-eval/ (report.md, cases.jsonl)
 
 Режим читается плагином перед каждым вызовом тула: перезапуск OpenCode не нужен.
 Для одного запуска режим задается переменной окружения JEV_MODE=off|shadow|on.
@@ -22,6 +27,7 @@ import collections
 import datetime as dt
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -214,6 +220,17 @@ def cmd_compare(first: str, second: str) -> int:
     return 0
 
 
+def cmd_eval(extra: list[str]) -> int:
+    runner = ROOT / ".opencode" / "jev" / "eval" / "run.ts"
+    if not runner.exists():
+        raise SystemExit(f"ошибка: нет {runner}; переустановите компонент jev")
+    node = shutil.which("node")
+    if node is None:
+        raise SystemExit("ошибка: для eval нужен Node.js 22.18+ (TypeScript и node:sqlite)")
+    command = [node, "--no-warnings", str(runner), "--root", str(ROOT), *extra]
+    return subprocess.run(command, cwd=ROOT).returncode
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):
         try:
@@ -231,6 +248,9 @@ def main() -> int:
     compare = sub.add_parser("compare", help="сравнение двух сессий")
     compare.add_argument("first")
     compare.add_argument("second")
+    sub.add_parser("eval", help="оценка Jev по истории сессий", add_help=False)
+    if len(sys.argv) > 1 and sys.argv[1] == "eval":
+        return cmd_eval(sys.argv[2:])
     args = parser.parse_args()
     if args.command in MODES:
         return cmd_set(args.command)

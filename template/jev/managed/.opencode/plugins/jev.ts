@@ -1,12 +1,12 @@
 // Слой решений Jev (agent-kit): фильтр релевантности вывода тулов и проверка отчетов субагентов.
 // Режимы (scripts/jev): off — плагин ничего не делает; shadow — решения только журналируются;
 // on — решения применяются. Любой сбой Jev или плагина оставляет вывод тула без изменений.
-import { basename } from "node:path"
 import type { Plugin, PluginInput } from "@opencode-ai/plugin"
 import { createDecide, type Decide } from "../jev/client.ts"
 import { loadTaskContext } from "../jev/context.ts"
 import { filterOutput, type FilterKind } from "../jev/filters.ts"
 import { writeLog, type Feature, type LogEntry } from "../jev/log.ts"
+import { readSkipReason } from "../jev/rules.ts"
 import { loadSettings, resolveMode, type Mode, type Settings } from "../jev/settings.ts"
 import { checkSubagent } from "../jev/subagent.ts"
 
@@ -25,20 +25,6 @@ export const JevPlugin: Plugin = async ({ client, directory }: PluginInput) => {
   }
   const log = (mode: Mode, entry: Omit<LogEntry, "mode">): void => writeLog(directory, { mode, ...entry })
 
-  function readSkipReason(run: Run, task: string): string | undefined {
-    const { args, sessionID } = run.call
-    const path = text(args["filePath"]).replaceAll("\\", "/")
-    if (args["offset"] !== undefined || args["limit"] !== undefined) return "explicit_range"
-    if (run.settings.filter.neverFilter.some((pattern) => new RegExp(pattern).test(path))) return "never_filter"
-    // Повторное чтение означает, что файл нужен агенту: фильтр не применяется.
-    const seen = readsBySession.get(sessionID) ?? new Set<string>()
-    readsBySession.set(sessionID, seen)
-    if (seen.has(path)) return "repeat_read"
-    seen.add(path)
-    if (task.includes(basename(path))) return "named_in_task"
-    return undefined
-  }
-
   async function filter(run: Run, kind: FilterKind): Promise<void> {
     const { call, out, mode, settings } = run
     const feature: Feature = kind === "read" ? "read_filter" : "output_filter"
@@ -48,7 +34,9 @@ export const JevPlugin: Plugin = async ({ client, directory }: PluginInput) => {
     const base = { session: call.sessionID, feature, tool: call.tool, target, beforeChars: out.output.length }
     const context = await loadTaskContext(client, call.sessionID)
     if (context === undefined) return log(mode, { ...base, decision: "skipped", reason: "no_task_context" })
-    const skip = kind === "read" ? readSkipReason(run, context.task) : undefined
+    const seen = readsBySession.get(call.sessionID) ?? new Set<string>()
+    readsBySession.set(call.sessionID, seen)
+    const skip = kind === "read" ? readSkipReason(call.args, context.task, seen, settings.filter) : undefined
     if (skip !== undefined) return log(mode, { ...base, decision: "skipped", reason: skip })
     const result = await filterOutput({ kind, source: target, output: out.output, context, decide: decideFor(settings), settings: settings.filter })
     switch (result.kind) {

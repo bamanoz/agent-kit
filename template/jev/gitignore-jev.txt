@@ -3,3 +3,4 @@
 .opencode/jev.mode
 .opencode/jev-log/
 *.bak-[0-9]*T[0-9]*
+.opencode/jev-eval/

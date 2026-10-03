@@ -12,26 +12,27 @@ export type TaskContext = {
   readonly intent: string
 }
 
-type PartLike = { readonly type: string; readonly text?: string; readonly synthetic?: boolean }
+export type PartLike = { readonly type: string; readonly text?: string; readonly synthetic?: boolean }
+export type MessageLike = { readonly role: string; readonly parts: readonly PartLike[] }
 
-const textOf = (parts: readonly PartLike[]): string =>
+export const textOf = (parts: readonly PartLike[]): string =>
   parts
     .flatMap((part) => (part.type === "text" && part.text !== undefined && part.synthetic !== true ? [part.text] : []))
     .join("\n")
     .trim()
 
 // Служебные напоминания оркестратора не являются постановкой задачи.
-const isReminder = (text: string): boolean => /^(\[SYSTEM|<system-reminder>|\[Agent Usage|\[BACKGROUND)/.test(text)
+export const isReminder = (text: string): boolean => /^(\[SYSTEM|<system-reminder>|\[Agent Usage|\[BACKGROUND)/.test(text)
 
-export async function loadTaskContext(client: Client, sessionID: string): Promise<TaskContext | undefined> {
-  const response = await client.session.messages({ path: { id: sessionID }, query: { limit: HISTORY_LIMIT } })
-  const messages = response.data
-  if (messages === undefined) return undefined
+// Сообщения в хронологическом порядке; задача — последний настоящий запрос пользователя.
+export function taskFromMessages(messages: readonly MessageLike[]): TaskContext | undefined {
   let intent = ""
-  for (const message of [...messages].reverse()) {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i]
+    if (message === undefined) continue
     const text = textOf(message.parts)
     if (text === "") continue
-    if (message.info.role === "assistant") {
+    if (message.role === "assistant") {
       if (intent === "") intent = text
       continue
     }
@@ -39,4 +40,11 @@ export async function loadTaskContext(client: Client, sessionID: string): Promis
     return { task: text.slice(0, TASK_CHARS), intent: intent.slice(-INTENT_CHARS) }
   }
   return undefined
+}
+
+export async function loadTaskContext(client: Client, sessionID: string): Promise<TaskContext | undefined> {
+  const response = await client.session.messages({ path: { id: sessionID }, query: { limit: HISTORY_LIMIT } })
+  const messages = response.data
+  if (messages === undefined) return undefined
+  return taskFromMessages(messages.map((message) => ({ role: message.info.role, parts: message.parts })))
 }

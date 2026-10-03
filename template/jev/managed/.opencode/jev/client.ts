@@ -62,17 +62,18 @@ function parseResponse(raw: unknown): { readonly answers: Record<string, Answer>
 }
 
 // Предохранитель: после серии сбоев Jev временно не вызывается, агент работает как без него.
-const BREAKER = { failuresToOpen: 3, openMs: 120000 } as const
+export type Breaker = { readonly failuresToOpen: number; readonly openMs: number }
+const BREAKER: Breaker = { failuresToOpen: 3, openMs: 120000 }
 const CACHE_LIMIT = 500
 
-export function createDecide(provider: Settings["provider"]): Decide {
+export function createDecide(provider: Settings["provider"], breaker: Breaker = BREAKER): Decide {
   let consecutiveFailures = 0
   let openUntil = 0
   const cache = new Map<string, DecisionOutcome & { readonly ok: true }>()
 
   const fail = (reason: string, started: number): DecisionOutcome => {
     consecutiveFailures += 1
-    if (consecutiveFailures >= BREAKER.failuresToOpen) openUntil = Date.now() + BREAKER.openMs
+    if (consecutiveFailures >= breaker.failuresToOpen) openUntil = Date.now() + breaker.openMs
     return { ok: false, reason, ms: Date.now() - started }
   }
 

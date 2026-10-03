@@ -7,4 +7,4 @@ cd "$DEV"
 [ -d node_modules/typescript ] || npm install --silent --no-audit --no-fund --no-save \
   typescript@6 @types/node@24 @opencode-ai/plugin@1.18.31 >/dev/null
 node node_modules/typescript/bin/tsc -p tsconfig.json
-node --test ../template/jev/managed/.opencode/jev/jev.test.ts
+node --test ../template/jev/managed/.opencode/jev/jev.test.ts ../template/jev/managed/.opencode/jev/eval/eval.test.ts
