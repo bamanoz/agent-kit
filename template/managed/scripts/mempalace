@@ -1,0 +1,13 @@
+#!/bin/sh
+# CLI Mempalace для палаты проекта (Linux, macOS, WSL), например:
+#   scripts/mempalace search "<запрос>" --wing <крыло>
+#   scripts/mempalace mine <каталог> --backend chroma --wing <крыло> --agent opencode
+# Парный файл для Windows — mempalace.cmd.
+cd "$(dirname "$0")/.." || exit 1
+export MEMPALACE_PALACE_PATH="${MEMPALACE_PALACE_PATH:-.mempalace/palace}"
+export MEMPALACE_BACKEND="${MEMPALACE_BACKEND:-chroma}"
+export MEMPALACE_EMBEDDING_MODEL="${MEMPALACE_EMBEDDING_MODEL:-{{EMBEDDING_MODEL}}}"
+export MEMPALACE_ENTITY_LANGUAGES="${MEMPALACE_ENTITY_LANGUAGES:-ru,en}"
+export MEMPALACE_HOOKS_AUTO_SAVE="${MEMPALACE_HOOKS_AUTO_SAVE:-0}"
+export ANONYMIZED_TELEMETRY="${ANONYMIZED_TELEMETRY:-False}"
+exec .venv-mempalace/bin/mempalace --palace .mempalace/palace "$@"

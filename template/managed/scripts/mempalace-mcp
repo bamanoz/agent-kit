@@ -1,0 +1,11 @@
+#!/bin/sh
+# Запуск MCP-сервера Mempalace проекта (Linux, macOS, WSL).
+# Используется из opencode.json; парный файл для Windows — mempalace-mcp.cmd.
+cd "$(dirname "$0")/.." || exit 1
+export MEMPALACE_PALACE_PATH="${MEMPALACE_PALACE_PATH:-.mempalace/palace}"
+export MEMPALACE_BACKEND="${MEMPALACE_BACKEND:-chroma}"
+export MEMPALACE_EMBEDDING_MODEL="${MEMPALACE_EMBEDDING_MODEL:-{{EMBEDDING_MODEL}}}"
+export MEMPALACE_ENTITY_LANGUAGES="${MEMPALACE_ENTITY_LANGUAGES:-ru,en}"
+export MEMPALACE_HOOKS_AUTO_SAVE="${MEMPALACE_HOOKS_AUTO_SAVE:-0}"
+export ANONYMIZED_TELEMETRY="${ANONYMIZED_TELEMETRY:-False}"
+exec .venv-mempalace/bin/mempalace-mcp --palace .mempalace/palace --backend chroma "$@"

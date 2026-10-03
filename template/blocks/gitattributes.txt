@@ -1,0 +1,5 @@
+# Управляется agent-kit: переводы строк скриптов запуска.
+scripts/agent-worktree text eol=lf
+scripts/mempalace text eol=lf
+scripts/mempalace-mcp text eol=lf
+scripts/*.cmd text eol=crlf

@@ -1,0 +1,15 @@
+# Управляется agent-kit: локальное состояние агентов, не версионируется.
+# Без завершающего слеша: в общем режиме .venv-mempalace является ссылкой.
+.venv-mempalace
+.mempalace/
+mempalace.yaml
+entities.json
+.worktrees/
+*.bak-[0-9]*T[0-9]*
+.codegraph
+.env
+# Служебное состояние OMO (boulder.json, run-continuation и пр.);
+# планы, notepads и evidence остаются локальными, правила версионируются.
+.omo/*
+!.omo/rules/
+!.omo/rules/**

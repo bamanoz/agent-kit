@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "plugin": ["{{OMO_PLUGIN}}"],
+  "mcp": {
+    "mempalace": {
+      "type": "local",
+      "command": ["scripts/mempalace-mcp"],
+      "enabled": true,
+      "timeout": 120000
+    }
+  }
+}

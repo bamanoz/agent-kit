@@ -1,0 +1,10 @@
+#!/bin/sh
+# Изолированные git worktree для параллельных субагентов (Linux, macOS, WSL).
+# Логика в agent_worktree.py; парный файл для Windows — agent-worktree.cmd.
+#   scripts/agent-worktree create|list|diff|merge|remove ...   справка: --help
+DIR=$(cd "$(dirname "$0")" && pwd)
+for py in python3 python; do
+  command -v "$py" >/dev/null 2>&1 && exec "$py" "$DIR/agent_worktree.py" "$@"
+done
+echo "ошибка: не найден python3" >&2
+exit 1

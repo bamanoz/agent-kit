@@ -1,0 +1,49 @@
+schemaVersion: 1
+updatedAt: "{{DATE}}"
+# Три независимых уровня baseline. Каждый уровень обновляется только после
+# фактического изменения: проект (требования, архитектура), реализация (код,
+# тесты), эксплуатация (установленные поставки). Отдельные срезы реализации
+# и поставок описываются вложенными блоками со ссылкой на CHG-*.
+
+designBaseline:
+  status: NOT_STARTED
+  # Документ требований или проектное решение, на котором основан проект.
+  requirements:
+    path: null
+    version: null
+  architectureRevision: ARCH-0001
+  # Изменения реализации, которые обязан включить следующий выпуск
+  # проектной документации; выпуск включает все записи и очищает список.
+  pendingUpdates: []
+  note: >-
+    Начальный baseline создан установщиком agent-kit.
+
+implementationBaseline:
+  status: NOT_STARTED
+  architectureRevision: ARCH-0001
+  changeControl: [CHG-0001]
+  sourceHead: null
+  verification: >-
+    Проверки не выполнялись.
+  # Пример среза реализации:
+  # featureSlug:
+  #   status: IMPLEMENTED
+  #   architectureRevision: ARCH-0001
+  #   changeControl: CHG-0002
+  #   scope: >-
+  #     Что реализовано.
+  #   verification: >-
+  #     Какие сборки и тесты фактически выполнены и с каким результатом.
+
+deploymentBaselines: {}
+  # Пример поставки:
+  # stagingYYYYMMDD:
+  #   status: DEPLOYED
+  #   changeControl: [CHG-0002]
+  #   architectureRevision: ARCH-0001
+  #   target: staging
+  #   deployedAt: "YYYY-MM-DD"
+  #   sourceHead: <commit>
+  #   sourceTree: clean
+  #   verification: >-
+  #     Проверки после установки.
