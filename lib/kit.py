@@ -113,7 +113,7 @@ def render_tree(src: Path, dst: Path, variables: dict, managed: bool) -> None:
     """
     for path in sorted(src.rglob("*")):
         rel = path.relative_to(src)
-        if path.is_dir():
+        if path.is_dir() or "__pycache__" in rel.parts or path.suffix == ".pyc":
             continue
         if path.name == ".keep-empty":
             if not DRY_RUN:
