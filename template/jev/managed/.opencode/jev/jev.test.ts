@@ -121,3 +121,13 @@ test("разбиение: идентификаторы задачи и разб�
   assert.deepEqual(parseReadOutput(readOutput(["a", "b"]))?.lines, ["1: a", "2: b"])
   assert.equal(splitChunks(Array.from({ length: 250 }, (_, i) => `${i}: x`), settings).length, 3)
 })
+
+test("идентификатор, встречающийся во всем файле, фрагменты не закрепляет", async () => {
+  const lines = Array.from({ length: 600 }, (_, i) => (i === 450 ? "var id = OprId; // UbsDrPs" : `// UbsDrPs строка ${i} ${"y".repeat(40)}`))
+  const wide = { task: "Исправь UbsDrPs: поиск по OprId", intent: "" }
+  const result = await filterOutput({ kind: "read", source: "File.cs", output: readOutput(lines), context: wide, decide: fakeDecide("никогда"), settings })
+  assert.equal(result.kind, "filtered")
+  if (result.kind !== "filtered") return
+  assert.match(result.output, /^451: var id = OprId;/m)
+  assert.ok(result.hidden >= 3)
+})

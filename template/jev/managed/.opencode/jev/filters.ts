@@ -56,9 +56,19 @@ const SIGNAL = /error|fail|exception|warn|ошибк|предупрежд|passed
 
 const lineOf = (line: string | undefined): number => Number.parseInt(line ?? "0", 10)
 
+// Закрепляют фрагмент только избирательные идентификаторы задачи: встречающиеся в небольшой доле
+// фрагментов. Общие для всего файла (имя проекта, namespace, типовые типы) ничего не говорят о нужном месте.
+const SELECTIVE_SHARE = 0.2
+
+function taskPins(chunks: readonly Chunk[], context: TaskContext, settings: Settings["filter"]): (chunk: Chunk) => boolean {
+  const limit = Math.max(1, Math.floor(chunks.length * SELECTIVE_SHARE))
+  const selective = taskIdentifiers(`${context.task}\n${context.intent}`, settings.pinPatterns).filter(
+    (id) => chunks.filter((chunk) => mentionsAny(chunk.text, [id])).length <= limit,
+  )
+  return (chunk) => mentionsAny(chunk.text, selective)
+}
+
 export function planFilter(kind: FilterKind, output: string, context: TaskContext, settings: Settings["filter"]): FilterPlan | undefined {
-  const identifiers = taskIdentifiers(`${context.task}\n${context.intent}`, settings.pinPatterns)
-  const pinByTask = (chunk: Chunk): boolean => mentionsAny(chunk.text, identifiers)
   const withCandidates = (plan: Omit<FilterPlan, "candidates">): FilterPlan => ({
     ...plan,
     candidates: plan.chunks.filter((chunk) => !plan.pinned.has(chunk.index)),
@@ -68,6 +78,7 @@ export function planFilter(kind: FilterKind, output: string, context: TaskContex
       const parsed = parseReadOutput(output)
       if (parsed === undefined) return undefined
       const chunks = splitChunks(parsed.lines, settings)
+      const pinByTask = taskPins(chunks, context, settings)
       // Первый фрагмент (заголовок, импорты) и фрагменты с идентификаторами задачи не скрываются.
       const pinned = new Set(chunks.filter((chunk) => chunk.index === 0 || pinByTask(chunk)).map((chunk) => chunk.index))
       return withCandidates({
@@ -80,6 +91,7 @@ export function planFilter(kind: FilterKind, output: string, context: TaskContex
     }
     case "output": {
       const chunks = splitChunks(output.split("\n"), settings)
+      const pinByTask = taskPins(chunks, context, settings)
       const last = chunks.length - 1
       const starts = chunks.map((chunk) => chunks.slice(0, chunk.index).reduce((sum, item) => sum + item.lines.length, 1))
       const pinned = new Set(

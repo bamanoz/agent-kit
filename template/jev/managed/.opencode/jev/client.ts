@@ -66,7 +66,14 @@ export type Breaker = { readonly failuresToOpen: number; readonly openMs: number
 const BREAKER: Breaker = { failuresToOpen: 3, openMs: 120000 }
 const CACHE_LIMIT = 500
 
-export function createDecide(provider: Settings["provider"], breaker: Breaker = BREAKER): Decide {
+// Ошибки, после которых повтор с тем же Idempotency-Key безопасен: провайдер вернет сохраненный ответ.
+const TRANSIENT = /^(timeout|http_(409|429|5\d\d))/
+
+export type DecideOptions = { readonly breaker?: Breaker; readonly retries?: number }
+
+export function createDecide(provider: Settings["provider"], options: DecideOptions = {}): Decide {
+  const breaker = options.breaker ?? BREAKER
+  const retries = options.retries ?? 0
   let consecutiveFailures = 0
   let openUntil = 0
   const cache = new Map<string, DecisionOutcome & { readonly ok: true }>()
@@ -77,7 +84,7 @@ export function createDecide(provider: Settings["provider"], breaker: Breaker = 
     return { ok: false, reason, ms: Date.now() - started }
   }
 
-  return async (request) => {
+  const once: Decide = async (request) => {
     const started = Date.now()
     if (started < openUntil) return { ok: false, reason: "breaker_open", ms: 0 }
     const key = loadApiKey(provider)
@@ -124,6 +131,16 @@ export function createDecide(provider: Settings["provider"], breaker: Breaker = 
     const outcome = { ok: true, ...parsed, ms: Date.now() - started, cached: false } as const
     if (cache.size >= CACHE_LIMIT) cache.clear()
     cache.set(digest, outcome)
+    return outcome
+  }
+
+  // В плагине повторов нет (retries = 0): ожидание не должно задерживать агента.
+  return async (request) => {
+    let outcome = await once(request)
+    for (let attempt = 1; attempt <= retries && !outcome.ok && TRANSIENT.test(outcome.reason); attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000 * attempt))
+      outcome = await once(request)
+    }
     return outcome
   }
 }

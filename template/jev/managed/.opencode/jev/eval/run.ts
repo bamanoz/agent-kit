@@ -14,7 +14,7 @@ import { summarize } from "./summary.ts"
 
 const LATER_TOOLS = 60
 const LATER_TEXTS = 12
-const CONCURRENCY = 4
+const CONCURRENCY = 2
 
 type Job = () => Promise<FilterCase | SubagentCase>
 type Queued = { readonly id: string; readonly kind: "read" | "output" | "subagent"; readonly job: Job }
@@ -38,8 +38,8 @@ const casesFile = join(outDir, "cases.jsonl")
 mkdirSync(outDir, { recursive: true })
 
 const settings = loadSettings(root)
-// В оценке предохранитель мягче: редкие 503 провайдера не должны останавливать прогон.
-const decide = createDecide(settings.provider, { failuresToOpen: 20, openMs: 30000 })
+// В оценке предохранитель не нужен, а временные ошибки провайдера повторяются с тем же ключом идемпотентности.
+const decide = createDecide({ ...settings.provider, timeoutMs: 30000 }, { breaker: { failuresToOpen: Number.POSITIVE_INFINITY, openMs: 0 }, retries: 4 })
 const limit = Number(values.limit)
 
 const caseId = (session: string, order: number): string => createHash("sha1").update(`${session}:${order}`).digest("hex").slice(0, 16)
