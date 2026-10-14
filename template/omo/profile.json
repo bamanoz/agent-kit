@@ -1,0 +1,498 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+  "[opencode]": {
+    "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
+    "runtime_fallback": {
+      "enabled": true,
+      "max_fallback_attempts": 6
+    },
+    "agents": {
+      "sisyphus": {
+        "model": "apiclo/claude-opus-5-5",
+        "reasoning": "high",
+        "fallback_models": [
+          {
+            "model": "closerouter-anthropic/anthropic/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/moonshotai/kimi-k3"
+          },
+          {
+            "model": "externcash/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "closerouter/z-ai/glm-5.2"
+          }
+        ]
+      },
+      "hephaestus": {
+        "model": "externcash/gpt-6.1-sol",
+        "reasoning": "medium",
+        "fallback_models": [
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "medium"
+          }
+        ]
+      },
+      "oracle": {
+        "model": "externcash/gpt-6.1-sol",
+        "reasoning": "high",
+        "fallback_models": [
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/google/gemini-3.1-pro",
+            "reasoning": "high"
+          },
+          {
+            "model": "externcash/gemini-3.1-pro",
+            "reasoning": "high"
+          },
+          {
+            "model": "apiclo/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/z-ai/glm-5.2"
+          }
+        ]
+      },
+      "librarian": {
+        "model": "externcash/gpt-6-luna",
+        "reasoning": "low",
+        "fallback_models": [
+          {
+            "model": "closerouter/openai/gpt-6-luna",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter/deepseek/deepseek-v4-flash-0731",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/qwen/qwen3.7-plus"
+          },
+          {
+            "model": "closerouter/minimax/minimax-m3"
+          },
+          {
+            "model": "closerouter/minimax/minimax-m2.7"
+          },
+          {
+            "model": "apiclo/claude-haiku-4-5"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-haiku-4.5"
+          }
+        ]
+      },
+      "explore": {
+        "model": "externcash/gpt-6-luna",
+        "reasoning": "low",
+        "fallback_models": [
+          {
+            "model": "closerouter/openai/gpt-6-luna",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter/deepseek/deepseek-v4-flash-0731",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/qwen/qwen3.7-plus"
+          },
+          {
+            "model": "closerouter/minimax/minimax-m3"
+          },
+          {
+            "model": "closerouter/minimax/minimax-m2.7"
+          },
+          {
+            "model": "apiclo/claude-haiku-4-5"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-haiku-4.5"
+          }
+        ]
+      },
+      "multimodal-looker": {
+        "model": "externcash/gpt-6.1-sol",
+        "reasoning": "low",
+        "fallback_models": [
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "low"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter/moonshotai/kimi-k3"
+          }
+        ]
+      },
+      "prometheus": {
+        "model": "apiclo/claude-opus-5-5",
+        "reasoning": "high",
+        "fallback_models": [
+          {
+            "model": "closerouter-anthropic/anthropic/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/moonshotai/kimi-k3",
+            "reasoning": "high"
+          }
+        ]
+      },
+      "metis": {
+        "model": "apiclo/claude-opus-5-5",
+        "reasoning": "high",
+        "fallback_models": [
+          {
+            "model": "closerouter-anthropic/anthropic/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/moonshotai/kimi-k3",
+            "reasoning": "low"
+          }
+        ]
+      },
+      "momus": {
+        "model": "externcash/gpt-5.6-terra",
+        "reasoning": "high",
+        "fallback_models": [
+          {
+            "model": "closerouter/openai/gpt-5.6-terra",
+            "reasoning": "high"
+          },
+          {
+            "model": "externcash/gpt-6.1-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "apiclo/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/google/gemini-3.1-pro",
+            "reasoning": "high"
+          },
+          {
+            "model": "externcash/gemini-3.1-pro",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/z-ai/glm-5.2"
+          }
+        ]
+      },
+      "atlas": {
+        "model": "apiclo/claude-opus-5-5",
+        "fallback_models": [
+          {
+            "model": "closerouter-anthropic/anthropic/claude-sonnet-5-5"
+          },
+          {
+            "model": "closerouter/moonshotai/kimi-k3"
+          },
+          {
+            "model": "externcash/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "closerouter/minimax/minimax-m3"
+          },
+          {
+            "model": "closerouter/minimax/minimax-m2.7"
+          }
+        ]
+      },
+      "sisyphus-junior": {
+        "model": "apiclo/claude-opus-5-5",
+        "fallback_models": [
+          {
+            "model": "closerouter-anthropic/anthropic/claude-sonnet-5-5"
+          },
+          {
+            "model": "closerouter/moonshotai/kimi-k3"
+          },
+          {
+            "model": "externcash/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "closerouter/minimax/minimax-m3"
+          },
+          {
+            "model": "closerouter/minimax/minimax-m2.7"
+          }
+        ]
+      }
+    },
+    "categories": {
+      "visual-engineering": {
+        "models": [
+          {
+            "model": "apiclo/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/moonshotai/kimi-k3",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/z-ai/glm-5.2",
+            "reasoning": "high"
+          },
+          {
+            "model": "externcash/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "medium"
+          }
+        ]
+      },
+      "ultrabrain": {
+        "models": [
+          {
+            "model": "externcash/gpt-6.1-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "high"
+          }
+        ]
+      },
+      "deep-low": {
+        "models": [
+          {
+            "model": "externcash/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "medium"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "medium"
+          }
+        ]
+      },
+      "artistry": {
+        "models": [
+          {
+            "model": "apiclo/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/moonshotai/kimi-k3",
+            "reasoning": "high"
+          },
+          {
+            "model": "apiclo/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-opus-5-5",
+            "reasoning": "high"
+          }
+        ]
+      },
+      "quick": {
+        "models": [
+          {
+            "model": "externcash/gpt-6-luna",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter/openai/gpt-6-luna",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter/deepseek/deepseek-v4-flash-0731",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter/minimax/minimax-m3",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/minimax/minimax-m2.7",
+            "reasoning": "high"
+          },
+          {
+            "model": "apiclo/claude-haiku-4-5",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-haiku-4.5",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter/moonshotai/kimi-k2.7-code-highspeed"
+          }
+        ]
+      },
+      "unspecified-low": {
+        "models": [
+          {
+            "model": "externcash/gpt-5.6-terra",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/openai/gpt-5.6-terra",
+            "reasoning": "high"
+          },
+          {
+            "model": "apiclo/claude-opus-5-5",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-sonnet-5-5",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter/qwen/qwen3.8-max",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/deepseek/deepseek-v4-pro-0813",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/xiaomi/mimo-v2.5-pro",
+            "reasoning": "high"
+          }
+        ]
+      },
+      "unspecified-high": {
+        "models": [
+          {
+            "model": "closerouter/moonshotai/kimi-k3",
+            "reasoning": "high"
+          },
+          {
+            "model": "apiclo/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-opus-5-5",
+            "reasoning": "high"
+          },
+          {
+            "model": "externcash/gpt-6.1-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "closerouter/openai/gpt-6.1-sol",
+            "reasoning": "high"
+          },
+          {
+            "model": "codexsale/gpt-6.1-sol",
+            "reasoning": "high"
+          }
+        ]
+      },
+      "writing": {
+        "models": [
+          {
+            "model": "closerouter/moonshotai/kimi-k3",
+            "reasoning": "low"
+          },
+          {
+            "model": "apiclo/claude-opus-5-5",
+            "reasoning": "low"
+          },
+          {
+            "model": "closerouter-anthropic/anthropic/claude-opus-5-5",
+            "reasoning": "low"
+          },
+          {
+            "model": "externcash/gemini-3.6-flash"
+          }
+        ]
+      }
+    }
+  },
+  "_migrations": [
+    "2026-07-opencode-config-unification",
+    "2026-08-reasoning-unification",
+    "2026-09-category-deep-split"
+  ]
+}

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Пошаговая установка agent-kit (Linux, macOS, WSL): спрашивает путь проекта
-# и параметры, затем разворачивает OMO, Mempalace и project-memory.
+# и параметры, затем разворачивает OMO, Mempalace, project-memory и focused-spec.
 # Запуск: ./setup.sh или двойной щелчок в файловом менеджере.
 # Для установки без вопросов используйте install.sh.
 

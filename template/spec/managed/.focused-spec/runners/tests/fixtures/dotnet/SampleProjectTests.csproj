@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Фикстура теста parseSelector: проект не собирается, проверяется только путь. -->
+</Project>

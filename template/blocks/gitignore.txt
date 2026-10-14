@@ -11,5 +11,6 @@ entities.json
 # Служебное состояние OMO (boulder.json, run-continuation и пр.);
 # планы, notepads и evidence остаются локальными, правила версионируются.
 .omo/*
+!.omo/omo.jsonc
 !.omo/rules/
 !.omo/rules/**

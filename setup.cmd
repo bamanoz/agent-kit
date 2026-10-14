@@ -1,6 +1,6 @@
 @echo off
 rem Пошаговая установка agent-kit (Windows): спрашивает путь проекта и
-rem параметры, затем разворачивает OMO, Mempalace и project-memory.
+rem параметры, затем разворачивает OMO, Mempalace, project-memory и focused-spec.
 rem Запуск: двойной щелчок или setup.cmd в cmd/PowerShell.
 rem Для установки без вопросов используйте install.cmd.
 setlocal

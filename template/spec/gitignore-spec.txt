@@ -1,0 +1,4 @@
+# Управляется agent-kit: зависимости Node.js для focused-spec (npm ci);
+# настройки ролей OMO проекта версионируются.
+node_modules/
+!.omo/omo.jsonc

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Установщик agent-kit: OMO, Mempalace, project-memory и правила агентов.
 
-Компоненты: base (OMO, Mempalace, project-memory, правила агентов) и jev
-(плагин OpenCode со слоем решений Jev, по умолчанию выключен).
+Компоненты: base (OMO, Mempalace, project-memory, правила агентов), spec
+(исполняемые спецификации focused-spec и SDD-роли OMO) и jev (плагин OpenCode
+со слоем решений Jev, по умолчанию выключен).
 
 Работает в Linux, macOS, WSL и Windows. Для запуска самого установщика
 достаточно Python 3.9+ со стандартной библиотекой; окружению Mempalace нужен
@@ -27,11 +28,20 @@ import sys
 import time
 from pathlib import Path
 
-KIT_VERSION = "1.2.0"
+KIT_VERSION = "1.3.1"
 MEMPALACE_VERSION = "3.9.0"
 EMBEDDING_MODEL = "embeddinggemma"
 MIN_VENV_PYTHON = (3, 12)
 DEFAULT_OMO = "oh-my-openagent@4.19.4"
+FOCUSED_SPEC_VERSION = "0.6.0"
+# Runner'ы .ts запускаются без сборки: нужна встроенная поддержка TypeScript в Node.
+MIN_NODE = (22, 18)
+SPEC_SCRIPTS = {
+    "spec:validate": "focused-spec validate",
+    "spec:run": "focused-spec run",
+    # Двойные кавычки: glob передается Node и в sh, и в cmd.exe.
+    "test:runners": 'node --test ".focused-spec/runners/tests/*.test.ts"',
+}
 
 KIT_DIR = Path(__file__).resolve().parent.parent
 TEMPLATE = KIT_DIR / "template"
@@ -43,7 +53,7 @@ MONTHS = ("января", "февраля", "марта", "апреля", "ма�
 # Скрипты-обертки для sh: должны оставаться исполняемыми и с LF.
 SH_SCRIPTS = ("scripts/agent-worktree", "scripts/mempalace", "scripts/mempalace-mcp")
 JEV_SH_SCRIPTS = ("scripts/jev",)
-COMPONENTS = ("base", "jev")
+COMPONENTS = ("base", "spec", "jev")
 # Запуски MCP из прежних версий комплекта, которые безопасно заменить.
 LEGACY_MCP_COMMANDS = (
     [".venv-mempalace/bin/mempalace-mcp", "--palace", ".mempalace/palace", "--backend", "chroma"],
@@ -234,6 +244,115 @@ def merge_opencode(project: Path, variables: dict, omo: str) -> None:
     out = ("\ufeff" if raw.startswith("\ufeff") else "") + with_newline(out, newline_of(raw))
     write_text(path, out)
     log("update", "opencode.json: " + ", ".join(changed))
+
+
+# ---------------------------------------------------------------- .omo/omo.jsonc
+
+OMO_HEADER = """// Конфигурация OMO проекта: модели агентов и категорий с резервными маршрутами
+// (профиль agent-kit) и дополнения ролей. Файл проекта выше по приоритету, чем
+// личный ~/.omo/omo.jsonc: при совпадении ключей действуют значения отсюда.
+// Провайдеры из маршрутов должны быть подключены в OpenCode (opencode auth login);
+// недоступные маршруты замените своими. Повторная установка agent-kit добавляет
+// только отсутствующие ключи и не меняет значения проекта.
+"""
+
+
+def strip_jsonc(text: str) -> str:
+    """Убирает комментарии // и /* */ вне строк и висячие запятые."""
+    out, i, n, in_str = [], 0, len(text), False
+    while i < n:
+        char = text[i]
+        if in_str:
+            out.append(char)
+            if char == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            in_str = char != '"'
+            i += 1
+        elif char == '"':
+            in_str = True
+            out.append(char)
+            i += 1
+        elif text.startswith("//", i):
+            while i < n and text[i] not in "\r\n":
+                i += 1
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            if end < 0:
+                raise KitError("Незакрытый комментарий в .omo/omo.jsonc")
+            out.append(" ")
+            i = end + 2
+        else:
+            out.append(char)
+            i += 1
+    # Второй проход: убираем висячие запятые только вне строк.
+    clean = "".join(out)
+    out, i, in_str = [], 0, False
+    while i < len(clean):
+        char = clean[i]
+        if in_str:
+            out.append(char)
+            if char == "\\" and i + 1 < len(clean):
+                out.append(clean[i + 1])
+                i += 2
+                continue
+            in_str = char != '"'
+        elif char == '"':
+            in_str = True
+            out.append(char)
+        elif char == ",":
+            following = clean[i + 1:].lstrip()
+            if not following or following[0] not in "}]":
+                out.append(char)
+        else:
+            out.append(char)
+        i += 1
+    return "".join(out)
+
+
+def fill_missing(target: dict, source: dict, path: str = "") -> list:
+    """Добавляет в target отсутствующие ключи source; значения target не меняются."""
+    added = []
+    for key, value in source.items():
+        if key not in target:
+            target[key] = value
+            added.append(path + key)
+        elif isinstance(target[key], dict) and isinstance(value, dict):
+            added += fill_missing(target[key], value, f"{path}{key}.")
+    return added
+
+
+def merge_omo(project: Path, layers: list) -> None:
+    """Сливает слои комплекта в .omo/omo.jsonc с приоритетом существующих значений проекта."""
+    path = project / ".omo" / "omo.jsonc"
+    if path.exists():
+        raw = read_text(path)
+        try:
+            config = json.loads(strip_jsonc(raw.lstrip("\ufeff")))
+        except json.JSONDecodeError as exc:
+            raise KitError(f".omo/omo.jsonc не разобран ({exc}); добавьте профиль из template/omo вручную") from exc
+        if not isinstance(config, dict):
+            raise KitError(".omo/omo.jsonc должен содержать объект JSON")
+    else:
+        raw, config = "", {}
+    added = []
+    for layer in layers:
+        added += fill_missing(config, json.loads(read_text(layer)))
+    if not added:
+        log("ok", ".omo/omo.jsonc содержит профиль комплекта")
+        return
+    ordered = {key: config[key] for key in ("$schema", "[opencode]") if key in config}
+    ordered |= {key: value for key, value in config.items() if key not in ordered}
+    out = OMO_HEADER + json.dumps(ordered, ensure_ascii=False, indent=2) + "\n"
+    if raw:
+        backup(path)
+        if "//" in raw or "/*" in raw:
+            log("warn", ".omo/omo.jsonc: комментарии прежнего файла сохранены только в резервной копии")
+        out = ("\ufeff" if raw.startswith("\ufeff") else "") + with_newline(out, newline_of(raw))
+    write_text(path, out)
+    shown = ", ".join(added[:6]) + (f" и еще {len(added) - 6}" if len(added) > 6 else "")
+    log("update" if raw else "create", f".omo/omo.jsonc: {shown}")
 
 
 # ---------------------------------------------------------------- Mempalace
@@ -523,6 +642,106 @@ def install_jev(project: Path, variables: dict) -> None:
     log("ok", f"режим Jev: {mode} (переключение: scripts/jev on|shadow|off)")
 
 
+def merge_package_json(project: Path) -> bool:
+    """Добавляет focused-spec и npm-скрипты; версии и скрипты проекта не меняются.
+    Возвращает True, если package.json изменен."""
+    path = project / "package.json"
+    if path.exists():
+        raw = read_text(path)
+        try:
+            config = json.loads(raw.lstrip("\ufeff"))
+        except json.JSONDecodeError as exc:
+            raise KitError(f"package.json не разобран как JSON ({exc}); добавьте focused-spec вручную") from exc
+    else:
+        raw, config = "", {"private": True}
+    changed = []
+    deps = config.setdefault("devDependencies", {})
+    current = deps.get("focused-spec") or (config.get("dependencies") or {}).get("focused-spec")
+    if current is None:
+        deps["focused-spec"] = FOCUSED_SPEC_VERSION
+        changed.append(f"focused-spec {FOCUSED_SPEC_VERSION}")
+    elif current != FOCUSED_SPEC_VERSION:
+        log("keep", f"package.json: focused-spec {current} задан проектом (комплект проверен с {FOCUSED_SPEC_VERSION})")
+    if not deps:
+        config.pop("devDependencies")
+    scripts = config.setdefault("scripts", {})
+    for name, command in SPEC_SCRIPTS.items():
+        if name not in scripts:
+            scripts[name] = command
+            changed.append(f"scripts.{name}")
+        elif scripts[name] != command:
+            log("keep", f"package.json: scripts.{name} задан проектом, не изменяется")
+    if not changed:
+        log("ok", "package.json актуален")
+        return False
+    out = json.dumps(config, ensure_ascii=False, indent=2) + "\n"
+    if raw:
+        backup(path)
+        out = ("\ufeff" if raw.startswith("\ufeff") else "") + with_newline(out, newline_of(raw))
+    write_text(path, out)
+    log("update" if raw else "create", "package.json: " + ", ".join(changed))
+    return True
+
+
+def node_tools() -> tuple[str, str] | None:
+    """Пути к node и npm, если Node подходит для runner'ов на TypeScript."""
+    node, npm = shutil.which("node"), shutil.which("npm")
+    if not node or not npm:
+        log("warn", "Node.js и npm не найдены: зависимости focused-spec не установлены")
+        return None
+    result = subprocess.run([node, "-p", "process.versions.node"], capture_output=True, text=True)
+    version = tuple(int(part) for part in re.findall(r"\d+", result.stdout)[:2])
+    if result.returncode != 0 or version < MIN_NODE:
+        log("warn", f"Node.js {result.stdout.strip() or '?'} старее {'.'.join(map(str, MIN_NODE))}: "
+                    "runner'ы focused-spec на TypeScript не запустятся")
+        return None
+    return node, npm
+
+
+def install_spec(project: Path, variables: dict, check: bool) -> None:
+    """Исполняемые спецификации focused-spec: runner'ы и навык управляются комплектом,
+    конфигурация, роли OMO и сами спецификации принадлежат проекту."""
+    spec = TEMPLATE / "spec"
+    step("focused-spec: управляемые файлы (runner'ы, навык)")
+    render_tree(spec / "managed", project, variables, managed=True)
+    step("focused-spec: файлы проекта (.focused-spec/config.yaml)")
+    render_tree(spec / "project", project, variables, managed=False)
+    step("focused-spec: роли OMO в .omo/omo.jsonc (значения проекта не меняются)")
+    merge_omo(project, [spec / "omo-roles.json"])
+    step("package.json и правила")
+    package_changed = merge_package_json(project)
+    upsert_block(project / ".gitignore", spec / "gitignore-spec.txt", "agent-kit-spec", "hash", variables)
+    upsert_block(project / "AGENTS.md", spec / "agents-spec.md", "agent-kit-spec", "md", variables,
+                 header=TEMPLATE / "blocks" / "agents-header.md")
+    step("focused-spec: зависимости Node.js")
+    if DRY_RUN:
+        log("dry-run", "npm install и проверка focused-spec")
+        return
+    tools = node_tools()
+    if tools is None:
+        log("hint", f"установите Node.js {'.'.join(map(str, MIN_NODE))}+ и выполните npm install в проекте")
+        return
+    node, npm = tools
+    # Измененный package.json требует обновить package-lock.json; иначе ставим строго по lock-файлу.
+    install = "ci" if (project / "package-lock.json").exists() and not package_changed else "install"
+    result = subprocess.run([npm, install, "--no-audit", "--no-fund", "--loglevel=error"], cwd=project)
+    if result.returncode != 0:
+        raise KitError(f"npm {install} завершился с кодом {result.returncode} (см. вывод выше)")
+    log("ok", f"npm {install}")
+    if not check:
+        return
+    cli = project / "node_modules" / "focused-spec" / "dist" / "cli.js"
+    for title, command in (("focused-spec validate", [node, str(cli), "validate"]),
+                           ("тесты runner'ов", [npm, "run", "--silent", "test:runners"])):
+        result = subprocess.run(command, cwd=project, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace")
+        if result.returncode != 0:
+            raise KitError(f"{title}: код {result.returncode}\n" + (result.stdout + result.stderr)[-2000:])
+        summary = [line for line in result.stdout.splitlines()
+                   if "focused specifications" in line or re.match(r"^\S* ?(pass|fail) \d+", line)]
+        log("ok", f"{title}: " + ("; ".join(summary) or "успешно"))
+
+
 def parse_components(raw: str) -> tuple[str, ...]:
     items = tuple(dict.fromkeys(part.strip() for part in raw.split(",") if part.strip()))
     unknown = [item for item in items if item not in COMPONENTS]
@@ -543,8 +762,9 @@ def cmd_install(args: argparse.Namespace) -> int:
     if project.exists() and not project.is_dir():
         raise KitError(f"{project} существует и не является каталогом")
 
+    skipped = {name for name, off in (("jev", args.no_jev), ("spec", args.no_spec)) if off}
     components = parse_components(args.only) if args.only else \
-        tuple(c for c in COMPONENTS if not (c == "jev" and args.no_jev))
+        tuple(c for c in COMPONENTS if c not in skipped)
     base = "base" in components
 
     state_path = project / ".agent-kit.json"
@@ -560,6 +780,7 @@ def cmd_install(args: argparse.Namespace) -> int:
         "DATE_HUMAN": f"{today.day} {MONTHS[today.month - 1]} {today.year}",
         "KIT_VERSION": KIT_VERSION, "EMBEDDING_MODEL": EMBEDDING_MODEL,
         "MEMPALACE_VERSION": MEMPALACE_VERSION, "OMO_PLUGIN": args.omo,
+        "FOCUSED_SPEC_VERSION": FOCUSED_SPEC_VERSION,
     }
 
     # Python для окружения ищется до любых изменений в проекте.
@@ -577,6 +798,8 @@ def cmd_install(args: argparse.Namespace) -> int:
 
     if base:
         install_base(project, args, variables, venv_python)
+    if "spec" in components:
+        install_spec(project, variables, check=not args.skip_probe)
     if "jev" in components:
         install_jev(project, variables)
 
@@ -594,16 +817,28 @@ def cmd_install(args: argparse.Namespace) -> int:
     step("Готово")
     hints = []
     if base:
+        if args.omo != "none" and not args.no_omo_profile:
+            hints.append("Подключите в OpenCode провайдеров из .omo/omo.jsonc (opencode auth login) "
+                         "или замените их маршрутами своих провайдеров.")
         hints += ["Заполните раздел «Проект» в AGENTS.md (вне блоков agent-kit).",
                   f"Запустите opencode в {project}: MCP mempalace и OMO подключатся автоматически.",
                   "Проверка: opencode mcp list"]
+    if "spec" in components:
+        hints += ["SDD включается явной просьбой создать спецификацию или работать по ней "
+                  "(раздел OmO and focused-spec в AGENTS.md); после установки перезапустите OpenCode."]
     if "jev" in components:
         hints += ["Jev выключен по умолчанию: scripts/jev shadow — только журнал решений, "
                   "scripts/jev on — применять; scripts/jev status — режим и ключ провайдера."]
-    commit = ["AGENTS.md", ".gitignore", ".agent-kit.json", "scripts/"]
+    commit = ["AGENTS.md", ".gitignore", ".agent-kit.json"]
+    if base or "jev" in components:
+        commit.append("scripts/")
     if base:
         commit[1:1] = ["opencode.json"]
-        commit += [".gitattributes", "project-memory/", ".opencode/commands/"]
+        commit += [".gitattributes", "project-memory/", ".opencode/commands/", ".omo/omo.jsonc"]
+    if "spec" in components:
+        commit += ["package.json", "package-lock.json", ".focused-spec/", ".opencode/skills/focused-spec/"]
+        if ".omo/omo.jsonc" not in commit:
+            commit.append(".omo/omo.jsonc")
     if "jev" in components:
         commit += [".opencode/plugins/jev.ts", ".opencode/jev/", ".opencode/jev.json"]
     hints.append("Закоммитьте " + ", ".join(commit) + ".")
@@ -644,6 +879,10 @@ def install_base(project: Path, args: argparse.Namespace, variables: dict, venv_
 
     step("opencode.json (OMO и MCP mempalace)")
     merge_opencode(project, variables, args.omo)
+
+    if args.omo != "none" and not args.no_omo_profile:
+        step("Профиль OMO в .omo/omo.jsonc (модели агентов и категорий; значения проекта не меняются)")
+        merge_omo(project, [TEMPLATE / "omo" / "profile.json"])
 
     if not args.no_mempalace:
         ensure_venv(project, args, venv_python)
@@ -696,7 +935,7 @@ def clean_path(raw: str) -> str:
 def cmd_wizard(_args: argparse.Namespace) -> int:
     """Пошаговая установка: запрашивает путь проекта и параметры."""
     print(f"agent-kit {KIT_VERSION}: установка агентской обвязки в проект")
-    print("OMO, Mempalace, project-memory и правила агентов. Ctrl+C — отмена.\n")
+    print("OMO, Mempalace, project-memory, focused-spec и правила агентов. Ctrl+C — отмена.\n")
     example = r"C:\work\my-project" if IS_WINDOWS else "~/work/my-project"
     while True:
         raw = clean_path(ask(f"Путь к каталогу проекта (например, {example})"))
@@ -731,21 +970,24 @@ def cmd_wizard(_args: argparse.Namespace) -> int:
     local = ask_yes("Отдельное окружение Mempalace внутри проекта (~430 МБ)? "
                     "Нет — одно общее окружение для всех проектов", default=False)
 
+    spec = ask_yes("Исполняемые спецификации focused-spec и SDD-роли OMO (нужен Node.js 22.18+)?")
     jev = ask_yes("Слой решений Jev (плагин OpenCode, по умолчанию выключен; нужен ключ ApiClo)?")
     argv = ["install", str(project), "--name", name, "--wing", wing, "--omo", omo,
-            "--venv", "local" if local else "shared"] + ([] if jev else ["--no-jev"])
+            "--venv", "local" if local else "shared"] + ([] if jev else ["--no-jev"]) \
+        + ([] if spec else ["--no-spec"])
     wheels = KIT_DIR / "wheels"
     if wheels.is_dir() and any(wheels.glob("*.whl")):
         argv += ["--wheelhouse", str(wheels)]
         print(f"  Найден каталог пакетов {wheels}: установка без обращения к PyPI.")
 
     print("\nБудет выполнено:")
-    print(f"  проект:     {project}")
-    print(f"  имя:        {name}")
-    print(f"  крыло:      {wing}")
-    print(f"  OMO:        {omo}")
-    print(f"  окружение:  {'в проекте (.venv-mempalace)' if local else default_venv_dir()}")
-    print(f"  Jev:        {'да (режим off до scripts/jev on|shadow)' if jev else 'нет'}")
+    print(f"  проект:       {project}")
+    print(f"  имя:          {name}")
+    print(f"  крыло:        {wing}")
+    print(f"  OMO:          {omo}")
+    print(f"  окружение:    {'в проекте (.venv-mempalace)' if local else default_venv_dir()}")
+    print(f"  focused-spec: {FOCUSED_SPEC_VERSION if spec else 'нет'}")
+    print(f"  Jev:          {'да (режим off до scripts/jev on|shadow)' if jev else 'нет'}")
     print("  Существующие файлы проекта не перезаписываются; измененные файлы сохраняются как *.bak-<время>.")
     if not ask_yes("\nПродолжить?"):
         print("Отменено, изменения не вносились.")
@@ -788,11 +1030,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--python", help="Python 3.12+ для создания окружения")
     p.add_argument("--wheelhouse", help="офлайн-установка пакетов из каталога wheel-файлов")
     p.add_argument("--no-mempalace", action="store_true", help="не устанавливать Mempalace (только файлы)")
+    p.add_argument("--no-omo-profile", action="store_true",
+                   help="не добавлять профиль моделей OMO в .omo/omo.jsonc (использовать ~/.omo/omo.jsonc)")
+    p.add_argument("--no-spec", action="store_true",
+                   help=f"не устанавливать исполняемые спецификации focused-spec {FOCUSED_SPEC_VERSION}")
     p.add_argument("--no-jev", action="store_true", help="не устанавливать слой решений Jev")
     p.add_argument("--only", metavar="КОМПОНЕНТЫ",
                    help=f"установить только перечисленные компоненты через запятую ({', '.join(COMPONENTS)}); "
                         "например --only jev для проекта с собственной обвязкой")
-    p.add_argument("--skip-probe", action="store_true", help="не проверять MCP-сервер после установки")
+    p.add_argument("--skip-probe", action="store_true",
+                   help="не проверять MCP-сервер и focused-spec после установки")
     p.add_argument("--dry-run", action="store_true", help="показать действия без изменений")
     p.set_defaults(func=cmd_install)
 
