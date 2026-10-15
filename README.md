@@ -5,7 +5,7 @@
 - **OMO**: плагин `oh-my-openagent@4.19.4` в `opencode.json` проекта и полный
   проектный профиль `.omo/omo.jsonc`: модели 11 агентов, 8 категорий,
   резервные маршруты и runtime fallback. Глобальный `~/.omo/omo.jsonc`
-  для этого профиля не нужен; провайдеры подключаются отдельно;
+  для этого профиля не нужен; [провайдеры](#провайдеры-для-omo) подключаются отдельно;
 - **Mempalace** 3.9.0: локальный MCP-сервер, палата `.mempalace/palace`,
   backend `chroma`, эмбеддинги `embeddinggemma`, отдельное крыло на проект.
   Автосохранение через hooks и телеметрия по умолчанию отключены;
@@ -23,6 +23,22 @@
   который через модель решений Jev скрывает нерелевантные задаче фрагменты
   больших выводов `read`/`bash` и помечает подозрительные отчеты субагентов.
   По умолчанию выключен; переключатель `scripts/jev on|shadow|off`.
+
+## Провайдеры для OMO
+
+Для регистрации можно использовать реферальные ссылки автора:
+
+| Провайдер | Регистрация | Дополнительно |
+| --- | --- | --- |
+| ApiClo | [apiclo.com](https://apiclo.com/r/10OEUU5avO) | |
+| ExCash | [excash.org](https://excash.org/?ref=REF-H9Z4FX) | Для доступа к ИИ в личном кабинете откройте «Настройки → Инвайт-коды» и введите `INV-YYRBPE` |
+| CloseRouter | [closerouter.dev](https://closerouter.dev/?ref=0f1e2dcdad28665c) | |
+| Codex Sale | [codex.sale](https://codex.sale/register?ref=cocmefirst) | |
+| ClaudeHub | [app.claudehub.fun](https://app.claudehub.fun/r/P93EN9) | |
+| CheapVibeCode | [cheapvibecode.ru](https://cheapvibecode.ru/ref/GSP4L66MA8) | |
+
+Регистрация не подключает провайдера автоматически: настройте его в OpenCode
+и сверьте доступные модели с маршрутами в `.omo/omo.jsonc`.
 
 ## Платформы
 
