@@ -1,9 +1,12 @@
-"""Проверки переноса профиля OMO: приоритет проекта и безопасное обновление JSONC."""
+"""Проверки компонентов установщика и безопасного обновления профиля OMO."""
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 from pathlib import Path
+from unittest.mock import patch
 import tempfile
 import unittest
 
@@ -85,6 +88,46 @@ class OmoProfileTests(unittest.TestCase):
             finally:
                 kit.DRY_RUN = False
             self.assertFalse(project.exists())
+
+
+class InstallerComponentTests(unittest.TestCase):
+    def test_components_and_default_installation(self):
+        self.assertEqual(kit.COMPONENTS, ("base", "spec"))
+        self.assertEqual(kit.parse_components("spec,base,spec"), ("spec", "base"))
+        with self.assertRaises(kit.KitError):
+            kit.parse_components("unsupported")
+        for options, expected in (([], ["base", "spec"]),
+                                  (["--no-spec"], ["base"]),
+                                  (["--no-spec", "--only", "spec"], ["spec"])):
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as tmp:
+                project = Path(tmp)
+                args = kit.build_parser().parse_args([
+                    "install", str(project), "--no-mempalace", "--skip-probe", *options,
+                ])
+                with patch.object(kit, "install_base") as base, \
+                     patch.object(kit, "install_spec") as spec, \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(args.func(args), 0)
+                self.assertEqual(base.call_count, int("base" in expected))
+                self.assertEqual(spec.call_count, int("spec" in expected))
+                state = json.loads((project / ".agent-kit.json").read_text(encoding="utf-8"))
+                self.assertEqual(state["components"], expected)
+
+    def test_wizard_dispatches_supported_components(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for use_spec in (True, False):
+                answers = iter((tmp, "Проверка мастера", "wizard_check", "none"))
+                with self.subTest(use_spec=use_spec), \
+                     patch.object(kit, "ask", side_effect=lambda *args: next(answers)), \
+                     patch.object(kit, "ask_yes", side_effect=[False, use_spec, True]) as ask_yes, \
+                     patch.object(kit, "cmd_install", return_value=0) as install, \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(kit.cmd_wizard(None), 0)
+                self.assertEqual(ask_yes.call_count, 3)
+                args = install.call_args.args[0]
+                self.assertEqual(args.no_spec, not use_spec)
+                self.assertEqual(args.omo, "none")
+                self.assertEqual(args.venv, "shared")
 
 
 if __name__ == "__main__":

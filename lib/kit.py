@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Установщик agent-kit: OMO, Mempalace, project-memory и правила агентов.
 
-Компоненты: base (OMO, Mempalace, project-memory, правила агентов), spec
-(исполняемые спецификации focused-spec и SDD-роли OMO) и jev (плагин OpenCode
-со слоем решений Jev, по умолчанию выключен).
+Компоненты: base (OMO, Mempalace, project-memory, правила агентов) и spec
+(исполняемые спецификации focused-spec и SDD-роли OMO).
 
 Работает в Linux, macOS, WSL и Windows. Для запуска самого установщика
 достаточно Python 3.9+ со стандартной библиотекой; окружению Mempalace нужен
@@ -52,8 +51,7 @@ MONTHS = ("января", "февраля", "марта", "апреля", "ма�
 
 # Скрипты-обертки для sh: должны оставаться исполняемыми и с LF.
 SH_SCRIPTS = ("scripts/agent-worktree", "scripts/mempalace", "scripts/mempalace-mcp")
-JEV_SH_SCRIPTS = ("scripts/jev",)
-COMPONENTS = ("base", "spec", "jev")
+COMPONENTS = ("base", "spec")
 # Запуски MCP из прежних версий комплекта, которые безопасно заменить.
 LEGACY_MCP_COMMANDS = (
     [".venv-mempalace/bin/mempalace-mcp", "--palace", ".mempalace/palace", "--backend", "chroma"],
@@ -624,24 +622,6 @@ def slug_wing(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
-def install_jev(project: Path, variables: dict) -> None:
-    """Слой решений Jev: плагин и скрипт управляются комплектом, настройки принадлежат проекту.
-    Режим по умолчанию off (файла .opencode/jev.mode нет): поведение агентов не меняется."""
-    jev = TEMPLATE / "jev"
-    step("Слой решений Jev: управляемые файлы (плагин, scripts/jev)")
-    render_tree(jev / "managed", project, variables, managed=True)
-    step("Слой решений Jev: настройки проекта (.opencode/jev.json)")
-    render_tree(jev / "project", project, variables, managed=False)
-    if IS_WINDOWS and not DRY_RUN:
-        git(project, "update-index", "--add", "--chmod=+x", *JEV_SH_SCRIPTS, check=False)
-    upsert_block(project / ".gitignore", jev / "gitignore-jev.txt", "agent-kit-jev", "hash", variables)
-    upsert_block(project / "AGENTS.md", jev / "agents-jev.md", "agent-kit-jev", "md", variables,
-                 header=TEMPLATE / "blocks" / "agents-header.md")
-    mode_file = project / ".opencode" / "jev.mode"
-    mode = mode_file.read_text(encoding="utf-8").strip() if mode_file.exists() else "off"
-    log("ok", f"режим Jev: {mode} (переключение: scripts/jev on|shadow|off)")
-
-
 def merge_package_json(project: Path) -> bool:
     """Добавляет focused-spec и npm-скрипты; версии и скрипты проекта не меняются.
     Возвращает True, если package.json изменен."""
@@ -762,9 +742,8 @@ def cmd_install(args: argparse.Namespace) -> int:
     if project.exists() and not project.is_dir():
         raise KitError(f"{project} существует и не является каталогом")
 
-    skipped = {name for name, off in (("jev", args.no_jev), ("spec", args.no_spec)) if off}
     components = parse_components(args.only) if args.only else \
-        tuple(c for c in COMPONENTS if c not in skipped)
+        tuple(c for c in COMPONENTS if not (c == "spec" and args.no_spec))
     base = "base" in components
 
     state_path = project / ".agent-kit.json"
@@ -800,8 +779,6 @@ def cmd_install(args: argparse.Namespace) -> int:
         install_base(project, args, variables, venv_python)
     if "spec" in components:
         install_spec(project, variables, check=not args.skip_probe)
-    if "jev" in components:
-        install_jev(project, variables)
 
     if not DRY_RUN:
         state.setdefault("installedAt", today.isoformat())
@@ -826,11 +803,8 @@ def cmd_install(args: argparse.Namespace) -> int:
     if "spec" in components:
         hints += ["SDD включается явной просьбой создать спецификацию или работать по ней "
                   "(раздел OmO and focused-spec в AGENTS.md); после установки перезапустите OpenCode."]
-    if "jev" in components:
-        hints += ["Jev выключен по умолчанию: scripts/jev shadow — только журнал решений, "
-                  "scripts/jev on — применять; scripts/jev status — режим и ключ провайдера."]
     commit = ["AGENTS.md", ".gitignore", ".agent-kit.json"]
-    if base or "jev" in components:
+    if base:
         commit.append("scripts/")
     if base:
         commit[1:1] = ["opencode.json"]
@@ -839,8 +813,6 @@ def cmd_install(args: argparse.Namespace) -> int:
         commit += ["package.json", "package-lock.json", ".focused-spec/", ".opencode/skills/focused-spec/"]
         if ".omo/omo.jsonc" not in commit:
             commit.append(".omo/omo.jsonc")
-    if "jev" in components:
-        commit += [".opencode/plugins/jev.ts", ".opencode/jev/", ".opencode/jev.json"]
     hints.append("Закоммитьте " + ", ".join(commit) + ".")
     print("  Дальше:\n" + "\n".join(f"  {i}. {hint}" for i, hint in enumerate(hints, 1)))
     return 0
@@ -971,10 +943,8 @@ def cmd_wizard(_args: argparse.Namespace) -> int:
                     "Нет — одно общее окружение для всех проектов", default=False)
 
     spec = ask_yes("Исполняемые спецификации focused-spec и SDD-роли OMO (нужен Node.js 22.18+)?")
-    jev = ask_yes("Слой решений Jev (плагин OpenCode, по умолчанию выключен; нужен ключ ApiClo)?")
     argv = ["install", str(project), "--name", name, "--wing", wing, "--omo", omo,
-            "--venv", "local" if local else "shared"] + ([] if jev else ["--no-jev"]) \
-        + ([] if spec else ["--no-spec"])
+            "--venv", "local" if local else "shared"] + ([] if spec else ["--no-spec"])
     wheels = KIT_DIR / "wheels"
     if wheels.is_dir() and any(wheels.glob("*.whl")):
         argv += ["--wheelhouse", str(wheels)]
@@ -987,7 +957,6 @@ def cmd_wizard(_args: argparse.Namespace) -> int:
     print(f"  OMO:          {omo}")
     print(f"  окружение:    {'в проекте (.venv-mempalace)' if local else default_venv_dir()}")
     print(f"  focused-spec: {FOCUSED_SPEC_VERSION if spec else 'нет'}")
-    print(f"  Jev:          {'да (режим off до scripts/jev on|shadow)' if jev else 'нет'}")
     print("  Существующие файлы проекта не перезаписываются; измененные файлы сохраняются как *.bak-<время>.")
     if not ask_yes("\nПродолжить?"):
         print("Отменено, изменения не вносились.")
@@ -1034,10 +1003,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="не добавлять профиль моделей OMO в .omo/omo.jsonc (использовать ~/.omo/omo.jsonc)")
     p.add_argument("--no-spec", action="store_true",
                    help=f"не устанавливать исполняемые спецификации focused-spec {FOCUSED_SPEC_VERSION}")
-    p.add_argument("--no-jev", action="store_true", help="не устанавливать слой решений Jev")
     p.add_argument("--only", metavar="КОМПОНЕНТЫ",
                    help=f"установить только перечисленные компоненты через запятую ({', '.join(COMPONENTS)}); "
-                        "например --only jev для проекта с собственной обвязкой")
+                        "например --only spec для проекта с собственной обвязкой")
     p.add_argument("--skip-probe", action="store_true",
                    help="не проверять MCP-сервер и focused-spec после установки")
     p.add_argument("--dry-run", action="store_true", help="показать действия без изменений")
