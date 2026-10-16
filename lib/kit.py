@@ -680,9 +680,18 @@ def check_spec_project(project: Path) -> None:
     """Reject unsupported existing installations before touching base or spec files."""
     config = project / ".focused-spec/config.yaml"
     if config.exists():
-        match = re.search(r"(?m)^version:\s*(\d+)\s*$", read_text(config))
-        if match is None or match.group(1) != "5":
-            raise KitError(f"{config}: существующая конфигурация не версии 5; миграция старых проектов не выполняется")
+        # Only the root scalar is needed for the pre-write migration guard. Do not
+        # mistake an indented plugin option for the configuration version.
+        lines = [line for line in read_text(config).lstrip("\ufeff").splitlines()
+                 if line.strip() and not line.lstrip().startswith("#")
+                 and line.strip() not in ("---", "...")]
+        indent = min((len(line) - len(line.lstrip(" ")) for line in lines), default=0)
+        roots = [line.strip() for line in lines if len(line) - len(line.lstrip(" ")) == indent]
+        keys = [line for line in roots
+                if re.match(r'''^(?:version|"version"|'version')[ \t]*:''', line)]
+        if len(keys) != 1 or not re.fullmatch(
+                r'''(?:version|"version"|'version')[ \t]*:[ \t]*5(?:[ \t]+\#.*)?[ \t]*''', keys[0]):
+            raise KitError(f"{config}: существующая конфигурация не версии 5 или версия записана в неподдерживаемой форме; миграция старых проектов не выполняется")
     manifest = project / "package.json"
     if manifest.exists():
         try:

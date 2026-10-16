@@ -122,6 +122,40 @@ class InstallerComponentTests(unittest.TestCase):
             self.assertEqual(skill.read_text(encoding="utf-8"), "Custom instructions\n")
             self.assertFalse((project / ".opencode/commands/focused-spec.md").exists())
 
+    def test_valid_yaml_version_variants_allow_repeat_install(self):
+        template = (KIT_ROOT / "template/spec/project/.focused-spec/config.yaml").read_text(encoding="utf-8")
+        for version in ("version: 5 # Версия конфигурации", '"version": 5', "\ufeffversion: 5"):
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as tmp:
+                project = Path(tmp)
+                config = project / ".focused-spec/config.yaml"
+                config.parent.mkdir(parents=True)
+                content = template.replace("version: 5", version.lstrip("\ufeff"))
+                if version.startswith("\ufeff"):
+                    content = "\ufeff" + content
+                config.write_text(content, encoding="utf-8")
+                args = kit.build_parser().parse_args([
+                    "install", str(project), "--only", "spec", "--dry-run", "--skip-probe"])
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(kit.cmd_install(args), 0)
+                self.assertEqual(config.read_text(encoding="utf-8"), content)
+                self.assertFalse((project / ".agent-kit.json").exists())
+
+    def test_nested_version_does_not_mask_legacy_root_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            config = project / ".focused-spec/config.yaml"
+            config.parent.mkdir(parents=True)
+            config.write_text("version: 2\nspecifications:\n  version: 5\n", encoding="utf-8")
+            args = kit.build_parser().parse_args([
+                "install", str(project), "--only", "base,spec", "--dry-run", "--no-mempalace"])
+            with patch.object(kit, "install_base") as base, \
+                 patch.object(kit, "install_spec") as spec, \
+                 self.assertRaisesRegex(kit.KitError, "не версии 5"):
+                kit.cmd_install(args)
+            base.assert_not_called()
+            spec.assert_not_called()
+            self.assertFalse((project / ".agent-kit.json").exists())
+
     def test_legacy_spec_project_refused_before_any_component_changes(self):
         for old_config, old_package in ((True, False), (False, True)):
             with self.subTest(old_config=old_config), tempfile.TemporaryDirectory() as tmp:
