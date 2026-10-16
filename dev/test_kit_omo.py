@@ -5,6 +5,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 import tempfile
@@ -91,6 +92,58 @@ class OmoProfileTests(unittest.TestCase):
 
 
 class InstallerComponentTests(unittest.TestCase):
+    def test_install_spec_checks_only_document_structure(self):
+        variables = {
+            "KIT_VERSION": kit.KIT_VERSION,
+            "FOCUSED_SPEC_VERSION": kit.FOCUSED_SPEC_VERSION,
+            "PROJECT_NAME": "Проверка установки", "WING": "install_check",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            with patch.object(kit, "node_tools", return_value=("node", "npm")), \
+                 patch.object(kit.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "", "")) as run, \
+                 contextlib.redirect_stdout(io.StringIO()):
+                kit.install_spec(project, variables, check=True)
+            commands = [call.args[0] for call in run.call_args_list]
+            self.assertEqual(commands, [
+                ["npm", "install", "--no-audit", "--no-fund", "--loglevel=error"],
+                ["node", str(project / "node_modules/focused-spec/dist/cli.js"), "validate", "--syntax-only"],
+            ])
+            # Проверка структуры не заменяет полную валидацию по явной команде проекта.
+            package = json.loads((project / "package.json").read_text(encoding="utf-8"))
+            self.assertEqual(package["scripts"]["spec:validate"], "focused-spec validate")
+            self.assertNotIn("test:runners", package["scripts"])
+            self.assertFalse((project / ".focused-spec/runners").exists())
+            config = (project / ".focused-spec/config.yaml").read_text(encoding="utf-8")
+            self.assertIn("runners: {}", config)
+            self.assertNotIn("dotnet-xunit:", config)
+            examples = project / ".opencode/skills/focused-spec/references/runner-templates/.focused-spec/runners"
+            self.assertTrue((examples / "dotnet-xunit.ts").exists())
+            self.assertTrue((examples / "py-unittest.ts").exists())
+
+    def test_install_spec_preserves_existing_runner_and_project_settings(self):
+        variables = {
+            "KIT_VERSION": kit.KIT_VERSION,
+            "FOCUSED_SPEC_VERSION": kit.FOCUSED_SPEC_VERSION,
+            "PROJECT_NAME": "Проверка обновления", "WING": "upgrade_check",
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            runner = project / ".focused-spec/runners/custom.ts"
+            runner.parent.mkdir(parents=True)
+            runner.write_text("// Проектный адаптер.\n", encoding="utf-8")
+            config = project / ".focused-spec/config.yaml"
+            original_config = "version: 2\nrunners:\n  custom:\n    module: ./.focused-spec/runners/custom.ts\n"
+            config.write_text(original_config, encoding="utf-8")
+            package = project / "package.json"
+            package.write_text(json.dumps({"scripts": {"test:runners": "node custom-tests.js"}}), encoding="utf-8")
+            with patch.object(kit, "node_tools", return_value=None), contextlib.redirect_stdout(io.StringIO()):
+                kit.install_spec(project, variables, check=True)
+            self.assertEqual(runner.read_text(encoding="utf-8"), "// Проектный адаптер.\n")
+            self.assertEqual(config.read_text(encoding="utf-8"), original_config)
+            self.assertEqual(json.loads(package.read_text(encoding="utf-8"))["scripts"]["test:runners"],
+                             "node custom-tests.js")
+
     def test_components_and_default_installation(self):
         self.assertEqual(kit.COMPONENTS, ("base", "spec"))
         self.assertEqual(kit.parse_components("spec,base,spec"), ("spec", "base"))

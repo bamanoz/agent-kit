@@ -13,10 +13,6 @@ specifications:
     - match: specs/{scope}/spec.md
       exclude: [specs/archive/**, specs/changes/**]
     - match: specs/changes/{scope}/spec.md
-runners:
-  py-unittest:
-    module: ./.focused-spec/runners/py-unittest.ts
-    timeoutMs: 600000
-  dotnet-xunit:
-    module: ./.focused-spec/runners/dotnet-xunit.ts
-    timeoutMs: 1800000
+# Агент подключает runner под стек проекта при первой задаче с исполняемым evidence.
+# Языковые SDK и тестовые фреймворки не навязываются установкой agent-kit.
+runners: {}

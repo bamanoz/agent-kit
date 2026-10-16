@@ -14,6 +14,6 @@ python3 -B -m unittest discover -s "$DEV" -p 'test_kit_omo.py'
 # Runner'ы проверяются в установленном виде: во временном проекте с focused-spec.
 SPEC_TMP=$(mktemp -d)
 trap 'rm -rf "$SPEC_TMP"' EXIT
-cp -r ../template/spec/managed/. "$SPEC_TMP/"
+cp -r ../template/spec/managed/.opencode/skills/focused-spec/references/runner-templates/. "$SPEC_TMP/"
 ln -s "$DEV/node_modules" "$SPEC_TMP/node_modules"
 (cd "$SPEC_TMP" && node --test ".focused-spec/runners/tests/*.test.ts")

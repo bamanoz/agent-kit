@@ -29,6 +29,39 @@ Before choosing a command or flag, consult the installed CLI: `focused-spec --he
 
 Evidence is `[planned:]<runner-id>::<opaque selector>`; only the first `::` separates the runner ID. Any scope may use `planned:` while that exact test is not implemented, but strict validation and `run` reject it. To reuse an ID from another scope, add exactly one `- **REVISES**: <source-scope>` row naming an existing same-ID scenario; repeated IDs must form a graph with one unmarked owner and no missing sources, self-revisions, or cycles. Never infer revision from framework headings or a special scope name.
 
+## Подготовка окружения под проект
+
+Чистая установка agent-kit не активирует языковые runner'ы. При первой задаче,
+требующей исполняемого evidence, подготовь интеграцию сам в пределах задачи
+и разрешений своей роли; пользователю не нужен отдельный запуск установщика.
+
+- Прочитай проектные инструкции, манифесты, lock-файлы и CI. Сохрани текущий
+  стек и тестовый фреймворк. Отсутствие runner'а не повод переходить на Python
+  или .NET; используй существующий либо создай подходящий по `references/runners.md`.
+- Проверь инструменты и подготовь проектные зависимости штатным способом.
+  Учитывай изоляцию среды, lock-файлы и правила проекта. Запроси разрешение,
+  если оно требуется для системного SDK, изменения прав или внешних действий;
+  не обходи ограничения и не считай отсутствие доступа успешной проверкой.
+- Неактивные примеры находятся в `references/runner-templates/.focused-spec/runners/`.
+  Для `py-unittest` нужны `py-unittest.ts`, `py_unittest_helper.py`, `process.ts`
+  и `package.json`; для `dotnet-xunit` нужны `dotnet-xunit.ts`,
+  `dotnet-xunit-lib.ts`, `process.ts` и `package.json`. Копируй только выбранную
+  реализацию в `.focused-spec/runners/`, сохраняя существующие файлы проекта.
+  Если требуются фикстурные тесты примера, скопируй соответствующий тест и его
+  фикстуры; не подключай чужой тестовый стек ради остальных примеров.
+- Зарегистрируй модуль в `.focused-spec/config.yaml`, не удаляя проектные
+  runner'ы и options. Для примеров можно использовать timeoutMs 600000
+  (`py-unittest`) и 1800000 (`dotnet-xunit`). Python unittest входит в Python;
+  .NET-runner требует SDK и пакеты именно целевого тестового проекта.
+- Докажи существование и реальное выполнение выбранного теста, включая
+  отрицательные проверки workflow. Неизвестный runner, пустой набор тестов,
+  `SKIP` или ошибка окружения не являются успешным evidence.
+
+Обычный `validate` вызывает разрешение `EVIDENCE`; оно может запускать сборку
+и восстановление зависимостей. `validate --syntax-only` этого не делает,
+но не подтверждает наличие или выполнение тестов. При необходимости запрета
+NuGet restore у .NET-примера есть `options.noRestore: true`.
+
 ## Configure when first needed
 
 Create `.focused-spec/config.yaml` when the first scenario names evidence. Select Markdown that contains focused scenarios or is being adopted incrementally, and exclude archives explicitly; do not create root-level `focused-spec.yaml`.

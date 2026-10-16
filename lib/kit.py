@@ -38,8 +38,6 @@ MIN_NODE = (22, 18)
 SPEC_SCRIPTS = {
     "spec:validate": "focused-spec validate",
     "spec:run": "focused-spec run",
-    # Двойные кавычки: glob передается Node и в sh, и в cmd.exe.
-    "test:runners": 'node --test ".focused-spec/runners/tests/*.test.ts"',
 }
 
 KIT_DIR = Path(__file__).resolve().parent.parent
@@ -679,10 +677,10 @@ def node_tools() -> tuple[str, str] | None:
 
 
 def install_spec(project: Path, variables: dict, check: bool) -> None:
-    """Исполняемые спецификации focused-spec: runner'ы и навык управляются комплектом,
-    конфигурация, роли OMO и сами спецификации принадлежат проекту."""
+    """Исполняемые спецификации focused-spec: навык и неактивные примеры управляются комплектом,
+    активные runner'ы, конфигурация, роли OMO и спецификации принадлежат проекту."""
     spec = TEMPLATE / "spec"
-    step("focused-spec: управляемые файлы (runner'ы, навык)")
+    step("focused-spec: навык и неактивные примеры runner'ов")
     render_tree(spec / "managed", project, variables, managed=True)
     step("focused-spec: файлы проекта (.focused-spec/config.yaml)")
     render_tree(spec / "project", project, variables, managed=False)
@@ -711,8 +709,8 @@ def install_spec(project: Path, variables: dict, check: bool) -> None:
     if not check:
         return
     cli = project / "node_modules" / "focused-spec" / "dist" / "cli.js"
-    for title, command in (("focused-spec validate", [node, str(cli), "validate"]),
-                           ("тесты runner'ов", [npm, "run", "--silent", "test:runners"])):
+    # Установка проверяет структуру, не запускает runner.resolve и восстановление зависимостей проекта.
+    for title, command in (("focused-spec validate --syntax-only", [node, str(cli), "validate", "--syntax-only"]),):
         result = subprocess.run(command, cwd=project, capture_output=True, text=True,
                                 encoding="utf-8", errors="replace")
         if result.returncode != 0:
@@ -802,7 +800,9 @@ def cmd_install(args: argparse.Namespace) -> int:
                   "Проверка: opencode mcp list"]
     if "spec" in components:
         hints += ["SDD включается явной просьбой создать спецификацию или работать по ней "
-                  "(раздел OmO and focused-spec в AGENTS.md); после установки перезапустите OpenCode."]
+                  "(раздел OmO and focused-spec в AGENTS.md); после установки перезапустите OpenCode.",
+                  "Runner и зависимости тестов агент подготавливает под стек проекта при первой задаче, "
+                  "которой они нужны; повторная установка agent-kit не требуется."]
     commit = ["AGENTS.md", ".gitignore", ".agent-kit.json"]
     if base:
         commit.append("scripts/")

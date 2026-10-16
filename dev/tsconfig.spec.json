@@ -8,6 +8,6 @@
     }
   },
   "include": [
-    "../template/spec/managed/.focused-spec/runners/**/*.ts"
+    "../template/spec/managed/.opencode/skills/focused-spec/references/runner-templates/.focused-spec/runners/**/*.ts"
   ]
 }
